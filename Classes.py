@@ -180,6 +180,7 @@ class Sortino:
         
         return self.weights_df
     
+#General model class 
 class BasePortfolioModel(ABC):
     @abstractmethod
     def fit(self, X_train, y_train):
@@ -198,7 +199,7 @@ class BasePortfolioModel(ABC):
         r2 = r2_score(y_test, preds)
         print(f"Evaluation -- MSE: {mse:.4f}, R2: {r2:.4f}")
         return mse, r2
-    
+# Linear Regression Model   
 class LinearRegressionModel(BasePortfolioModel):
     def __init__(self):
         self.model = LinearRegression()
@@ -209,7 +210,7 @@ class LinearRegressionModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
-    
+# NN model  
 class NeuralNetworkModel(BasePortfolioModel):
     def __init__(self, input_dim, hidden_units=64, learning_rate=0.001, epochs=50, batch_size=32):
         self.input_dim = input_dim
@@ -233,7 +234,7 @@ class NeuralNetworkModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X).flatten()
-    
+# SVR model    
 class SVRModel(BasePortfolioModel):
     def __init__(self, kernel='rbf', C=1.0, epsilon=0.1):
         self.model = SVR(kernel=kernel, C=C, epsilon=epsilon)
@@ -244,7 +245,7 @@ class SVRModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
-    
+#XGBoost   
 class XGBoostModel(BasePortfolioModel):
     def __init__(self, n_estimators=100, max_depth=3, learning_rate=0.1):
         self.model = xgb.XGBRegressor(n_estimators=n_estimators, max_depth=max_depth,
