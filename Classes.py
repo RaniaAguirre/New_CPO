@@ -14,6 +14,12 @@ import pickle
 from abc import ABC, abstractmethod
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
+import xgboost as xgb
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
 
 class Data:
     def __init__(self, tickers=None):
