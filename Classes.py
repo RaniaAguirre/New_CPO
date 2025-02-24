@@ -179,3 +179,80 @@ class Sortino:
             raise ValueError("Debes calcular los rendimientos y el Ratio de Sortino antes de crear el dataset.")
         
         return self.weights_df
+    
+class BasePortfolioModel(ABC):
+    @abstractmethod
+    def fit(self, X_train, y_train):
+        """Fit the model to training data."""
+        pass
+
+    @abstractmethod
+    def predict(self, X):
+        """Predict using the trained model."""
+        pass
+
+    def evaluate(self, X_test, y_test):
+        """Evaluate the model using MSE and R2."""
+        preds = self.predict(X_test)
+        mse = mean_squared_error(y_test, preds)
+        r2 = r2_score(y_test, preds)
+        print(f"Evaluation -- MSE: {mse:.4f}, R2: {r2:.4f}")
+        return mse, r2
+    
+class LinearRegressionModel(BasePortfolioModel):
+    def __init__(self):
+        self.model = LinearRegression()
+
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
+        print("Linear Regression model fitted.")
+
+    def predict(self, X):
+        return self.model.predict(X)
+    
+class NeuralNetworkModel(BasePortfolioModel):
+    def __init__(self, input_dim, hidden_units=64, learning_rate=0.001, epochs=50, batch_size=32):
+        self.input_dim = input_dim
+        self.hidden_units = hidden_units
+        self.learning_rate = learning_rate
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.model = self._build_model()
+
+    def _build_model(self):
+        model = Sequential()
+        model.add(Dense(self.hidden_units, input_dim=self.input_dim, activation='relu'))
+        model.add(Dense(self.hidden_units, activation='relu'))
+        model.add(Dense(1))  # Output layer for regression
+        model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
+        return model
+
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
+        print("Neural Network model trained.")
+
+    def predict(self, X):
+        return self.model.predict(X).flatten()
+    
+class SVRModel(BasePortfolioModel):
+    def __init__(self, kernel='rbf', C=1.0, epsilon=0.1):
+        self.model = SVR(kernel=kernel, C=C, epsilon=epsilon)
+
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
+        print("SVR model fitted.")
+
+    def predict(self, X):
+        return self.model.predict(X)
+    
+class XGBoostModel(BasePortfolioModel):
+    def __init__(self, n_estimators=100, max_depth=3, learning_rate=0.1):
+        self.model = xgb.XGBRegressor(n_estimators=n_estimators, max_depth=max_depth,
+                                      learning_rate=learning_rate, objective='reg:squarederror')
+
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
+        print("XGBoost model fitted.")
+
+    def predict(self, X):
+        return self.model.predict(X)
