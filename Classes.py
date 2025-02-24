@@ -10,8 +10,10 @@ import warnings
 import quantstats as qs
 import pickle
 
-import yfinance as yf
-import pandas as pd
+#ML libraries
+from abc import ABC, abstractmethod
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
 class Data:
     def __init__(self, tickers=None):
