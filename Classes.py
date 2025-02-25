@@ -228,7 +228,44 @@ class MarketFeaturesReplicator:
         replicated.reset_index(drop=True, inplace=True)
         return replicated
 
-    
+class SortinoSampler:
+    def __init__(self, merged_df, sortino_col="Sortino_Ratio", date_col="Date"):
+        """
+        Inicializa la clase con el DataFrame fusionado que contiene las market features y los control features,
+        incluyendo la columna del ratio de Sortino.
+        
+        Parameters:
+            merged_df (pd.DataFrame): DataFrame resultante del merge.
+            sortino_col (str): Nombre de la columna del ratio de Sortino (default "Sortino_Ratio").
+            date_col (str): Nombre de la columna de fecha (default "Date").
+        """
+        self.df = merged_df.copy()
+        self.sortino_col = sortino_col
+        self.date_col = date_col
+
+    def sample_best(self, n_best):
+        """
+        Para cada fecha, selecciona las n mejores muestras según el ratio de Sortino.
+        
+        Parameters:
+            n_best (int): Número de muestras a conservar por cada fecha.
+        
+        Returns:
+            pd.DataFrame: DataFrame con las n mejores combinaciones por fecha.
+        """
+        # Verifica que las columnas necesarias existan en el DataFrame
+        if self.sortino_col not in self.df.columns:
+            raise ValueError(f"La columna {self.sortino_col} no se encuentra en el DataFrame.")
+        if self.date_col not in self.df.columns:
+            raise ValueError(f"La columna {self.date_col} no se encuentra en el DataFrame.")
+        
+        # Agrupar por fecha, ordenar de forma descendente por el ratio de Sortino y tomar las n mejores filas de cada grupo
+        sampled_df = self.df.groupby(self.date_col, group_keys=False).apply(
+            lambda group: group.nlargest(n_best, self.sortino_col)
+        )
+        return sampled_df
+        
+
 #General model class 
 class BasePortfolioModel(ABC):
     @abstractmethod
