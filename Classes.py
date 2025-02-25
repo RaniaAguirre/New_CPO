@@ -257,3 +257,103 @@ class XGBoostModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
+    
+
+class Market_Features:
+    def __init__(self):
+        pass
+    
+    def fred_data(self, api_key, indicator, start_date, end_date, frequency):
+        """
+        Descarga datos de la API de la Reserva Federal de St. Louis (FRED).
+        
+        Parámetros:
+        api_key (str): Clave de la API FRED.
+        indicator (str): Código del indicador a consultar.
+        start_date (str): Fecha de inicio en formato 'YYYY-MM-DD'.
+        end_date (str): Fecha de fin en formato 'YYYY-MM-DD'.
+        frequency (str): Frecuencia de los datos ('d' para diario, 'm' para mensual, etc.).
+        
+        Retorna:
+        pd.DataFrame: DataFrame con los datos obtenidos.
+        """
+        params = {
+            'api_key': api_key,
+            'file_type': 'json',
+            'series_id': indicator,
+            'realtime_start': end_date,
+            'realtime_end': end_date,
+            "observation_start": start_date,
+            "observation_end": end_date,
+            'frequency': frequency,
+        }
+
+        url_base = 'https://api.stlouisfed.org/'
+        endpoint = 'fred/series/observations'
+        url = url_base + endpoint
+
+        res = requests.get(url, params=params)
+        data = res.json()
+        
+        if 'observations' in data:
+            df = pd.DataFrame(data['observations'])
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.rename(columns={'value': indicator})
+            df = df.drop(columns=['realtime_start', 'realtime_end'])
+            df.set_index('date', inplace=True)
+            return df
+        else:
+            raise ValueError("No se encontraron datos para el indicador y fechas proporcionadas.")
+    
+    def read_multiple_csv(self, folder_path):
+        """
+        Lee múltiples archivos CSV y XLSX desde una carpeta y los concatena en un solo DataFrame.
+        Si los archivos tienen diferentes estructuras, se combinan con un merge basado en la columna 'date'.
+    
+        Parámetros:
+        folder_path (str): Ruta de la carpeta donde están los archivos.
+    
+        Retorna:
+        pd.DataFrame: DataFrame combinado con los datos de todos los archivos, eliminando filas con valores NaN.
+        """
+        all_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
+    
+        if not all_files:
+            raise ValueError("No se encontraron archivos CSV")
+    
+        df_list = []
+        for file in all_files:
+            file_path = os.path.join(folder_path, file)
+            if file.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            df_list.append(df)
+    
+        # Unir todos los DataFrames en uno solo considerando la columna 'date' como referencia
+        combined_df = df_list[0]
+        for df in df_list[1:]:
+            combined_df = pd.merge(combined_df, df, on='date', how='outer')
+    
+        # Asegurarse de que la columna 'date' esté en formato datetime y establecer como índice
+        combined_df['date'] = pd.to_datetime(combined_df['date'], errors='coerce')
+    
+        # Eliminar filas con valores NaN en columnas diferentes a 'date'
+        combined_df.dropna(subset=combined_df.columns.difference(['date']), inplace=True)
+    
+        # Establecer la columna 'date' como índice
+        combined_df.set_index('date', inplace=True)
+        return combined_df
+
+    
+    def add_column_to_dataframe(self, df1, df2):
+        """
+        Agrega una nueva columna de un DataFrame a otro basado en la columna 'date'.
+        
+        Parámetros:
+        df1 (pd.DataFrame): DataFrame base al que se agregará la nueva columna.
+        df2 (pd.DataFrame): DataFrame que contiene la columna a agregar.
+        
+        Retorna:
+        pd.DataFrame: DataFrame combinado con la nueva columna agregada.
+        """
+        combined_df = pd.merge(df1, df2, how='outer', on='date')
+        return combined_df
