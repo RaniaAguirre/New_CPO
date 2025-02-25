@@ -179,6 +179,55 @@ class Sortino:
             raise ValueError("Debes calcular los rendimientos y el Ratio de Sortino antes de crear el dataset.")
         
         return self.weights_df
+
+class MarketFeaturesReplicator:
+    def __init__(self, filepath, replication_factor=100):
+        """
+        Inicializa la clase con la ruta del archivo .xlsx y el factor de replicación.
+        
+        Parameters:
+        filepath (str): Ruta del archivo .xlsx con las market features.
+        replication_factor (int): Número de veces que se replica cada fila (por ejemplo, 100).
+        """
+        self.filepath = filepath
+        self.replication_factor = replication_factor
+        self.market_features = None
+
+    def load_market_features(self):
+        """
+        Carga el archivo .xlsx y lo almacena en un DataFrame.
+        Se espera que el archivo tenga una columna 'Date' que identifica cada día.
+        
+        Returns:
+        pd.DataFrame: DataFrame con las market features.
+        """
+        self.market_features = pd.read_excel(self.filepath)
+        if 'Date' in self.market_features.columns:
+            self.market_features['Date'] = pd.to_datetime(self.market_features['Date'])
+        else:
+            raise ValueError("El archivo debe contener una columna 'Date'.")
+        return self.market_features
+
+    def replicate_market_features(self):
+        """
+        Replica cada fila del DataFrame de market features tantas veces como indique replication_factor.
+        Esto se hace para que por cada día se tengan múltiples muestras (Tantos portafolios como se hayan calculado para el ratio de sortino)
+          
+         en este caso los 100 portafolios generados para cada día de muestra.
+        
+        Returns:
+        pd.DataFrame: DataFrame con las market features replicadas.
+        """
+        if self.market_features is None:
+            self.load_market_features()
+        
+        # Se asume que cada fila representa un día único.
+        # Se replica cada fila replication_factor veces.
+        replicated = self.market_features.loc[self.market_features.index.repeat(self.replication_factor)].copy()
+        # Reiniciamos el índice para tener un DataFrame ordenado.
+        replicated.reset_index(drop=True, inplace=True)
+        return replicated
+
     
 #General model class 
 class BasePortfolioModel(ABC):
