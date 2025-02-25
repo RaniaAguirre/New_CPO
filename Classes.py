@@ -101,7 +101,7 @@ class Sortino:
         self.selected_assets = np.random.choice(self.returns_df.columns, size=num_assets, replace=False)
         print(f"Activos seleccionados: {self.selected_assets}")
 
-    def generate_multiple_weights(self, num_combinations=100):
+    def generate_multiple_weights(self, num_combinations=1000):
         """
         Genera múltiples combinaciones de pesos aleatorios para los activos seleccionados.
         
