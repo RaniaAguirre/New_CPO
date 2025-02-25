@@ -53,7 +53,7 @@ class Data:
                 data = yf.download(ticker, start=self.fecha_inicio, end=self.fecha_fin)
                 # Seleccionar solo la columna 'Close' y renombrarla para evitar conflictos
                 data = data[['Close']].rename(columns={'Close': ticker})
-                data = data.resample('ME').last()
+                data = data.resample('M').last()
                 datos.append(data)
             except Exception as e:
                 print(f"Error al descargar datos para {ticker}: {e}")
