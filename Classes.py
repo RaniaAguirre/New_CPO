@@ -264,7 +264,28 @@ class SortinoSampler:
             lambda group: group.nlargest(n_best, self.sortino_col)
         )
         return sampled_df
+
+    def sample_random(self, n_random):
+        """
+        Para cada fecha, selecciona aleatoriamente n filas.
         
+        Parameters:
+            n_random (int): Número de muestras aleatorias a seleccionar por cada fecha.
+        
+        Returns:
+            pd.DataFrame: DataFrame con n filas aleatorias por fecha.
+        """
+        # Verifica que la columna de fecha exista
+        if self.date_col not in self.df.columns:
+            raise ValueError(f"La columna {self.date_col} no se encuentra en el DataFrame.")
+        
+        # Agrupar por fecha y aplicar sample a cada grupo.
+        # Se usa replace=False asumiendo que cada grupo tiene al menos n_random filas.
+        sampled_df = self.df.groupby(self.date_col, group_keys=False).apply(
+            lambda group: group.sample(n=n_random, random_state=42)
+        )
+        return sampled_df
+
 
 #General model class 
 class BasePortfolioModel(ABC):
