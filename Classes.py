@@ -6,6 +6,7 @@ import scipy.optimize as sco
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
+import warnings
 import quantstats as qs
 
 #ML libraries
@@ -37,7 +38,17 @@ class Data:
             print(f"Error al obtener la lista de tickers: {e}")
 
     def sp100(self):
+        if not self.tickers:
+            raise ValueError("Primero debes cargar los tickers del S&P500 usando sp500().")
         return self.tickers[:100]
+    
+    def choose_random_tickers(self, num=15):
+        """
+        Selecciona num tickers aleatorios a partir de los primeros 100 tickers del S&P500.
+        """
+        sp100_tickers = self.sp100()
+        selected = np.random.choice(sp100_tickers, size=num, replace=False).tolist()
+        self.tickers = selected
 
     def datadownload(self):
         if not self.tickers:
@@ -67,7 +78,7 @@ class Data:
         if df_precios is None:
             raise ValueError("Debes proporcionar un DataFrame con precios.")
         
-        # Calcular rendimientos porcentuales diarios
+        # Calcular rendimientos porcentuales
         df_rendimientos = df_precios.pct_change(fill_method=None).dropna(how='all') 
         
         return df_rendimientos
@@ -83,21 +94,6 @@ class Sortino:
         self.returns_df = returns_df
         self.selected_assets = None
         self.portfolio_data = None
-
-    def select_random_assets(self, num_assets=15):
-        """
-        Selecciona un número específico de activos aleatorios del DataFrame de rendimientos.
-        Estos activos serán los mismos para todas las fechas.
-        
-        Parameters:
-        num_assets (int): Número de activos a seleccionar.
-        """
-        if num_assets > len(self.returns_df.columns):
-            raise ValueError("El número de activos solicitado es mayor que el número de columnas disponibles.")
-        
-        # Seleccionar activos aleatorios (fijos para todas las fechas)
-        self.selected_assets = np.random.choice(self.returns_df.columns, size=num_assets, replace=False)
-        print(f"Activos seleccionados: {self.selected_assets}")
 
     def generate_multiple_weights(self, num_combinations=1000):
         """
