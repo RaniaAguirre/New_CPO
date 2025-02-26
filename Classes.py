@@ -399,13 +399,14 @@ class Market_Features:
         
         if 'observations' in data:
             df = pd.DataFrame(data['observations'])
-            df['date'] = pd.to_datetime(df['date'])
+            df['Date'] = pd.to_datetime(df['date'])
             df = df.rename(columns={'value': indicator})
-            df = df.drop(columns=['realtime_start', 'realtime_end'])
-            df.set_index('date', inplace=True)
+            df = df.drop(columns=['realtime_start', 'realtime_end', 'date'])
+            df.set_index('Date', inplace=True)
             return df
         else:
             raise ValueError("No se encontraron datos para el indicador y fechas proporcionadas.")
+    
     
     def read_multiple_csv(self, folder_path):
         """
@@ -436,13 +437,14 @@ class Market_Features:
             combined_df = pd.merge(combined_df, df, on='date', how='outer')
     
         # Asegurarse de que la columna 'date' esté en formato datetime y establecer como índice
-        combined_df['date'] = pd.to_datetime(combined_df['date'], errors='coerce')
+        combined_df['Date'] = pd.to_datetime(combined_df['date'], errors='coerce')
     
         # Eliminar filas con valores NaN en columnas diferentes a 'date'
         combined_df.dropna(subset=combined_df.columns.difference(['date']), inplace=True)
     
         # Establecer la columna 'date' como índice
-        combined_df.set_index('date', inplace=True)
+        combined_df.set_index('Date', inplace=True)
+        combined_df = combined_df.drop(columns=['date'])
         return combined_df
 
     
@@ -457,5 +459,5 @@ class Market_Features:
         Retorna:
         pd.DataFrame: DataFrame combinado con la nueva columna agregada.
         """
-        combined_df = pd.merge(df1, df2, how='outer', on='date')
+        combined_df = pd.merge(df1, df2, how='outer', on='Date')
         return combined_df
