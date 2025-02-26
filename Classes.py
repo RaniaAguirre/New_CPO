@@ -62,7 +62,7 @@ class Data:
                 data = yf.download(ticker, start=self.fecha_inicio, end=self.fecha_fin)
                 # Seleccionar solo la columna 'Close' y renombrarla para evitar conflictos
                 data = data[['Close']].rename(columns={'Close': ticker})
-                data = data.resample('M').last()
+                data = data.resample('ME').last()
                 datos.append(data)
             except Exception as e:
                 print(f"Error al descargar datos para {ticker}: {e}")
@@ -84,15 +84,20 @@ class Data:
         return df_rendimientos
 
 class Sortino:
-    def __init__(self, returns_df):
+    def __init__(self, returns_df, selected_assets=None):
         """
-        Inicializa la clase con un DataFrame de rendimientos.
+        Inicializa la clase con un DataFrame de rendimientos y una lista de activos.
         
         Parameters:
-        returns_df (pd.DataFrame): DataFrame con rendimientos históricos de activos.
+            returns_df (pd.DataFrame): DataFrame con rendimientos históricos (mensuales).
+            selected_assets (list, optional): Lista de tickers a utilizar. Si es None, se extraen de returns_df.
         """
         self.returns_df = returns_df
-        self.selected_assets = None
+        # Si no se pasan activos seleccionados, se asume que son las columnas del DataFrame de rendimientos.
+        if selected_assets is None:
+            self.selected_assets = list(returns_df.columns)
+        else:
+            self.selected_assets = selected_assets
         self.portfolio_data = None
 
     def generate_multiple_weights(self, num_combinations=1000):
@@ -100,11 +105,8 @@ class Sortino:
         Genera múltiples combinaciones de pesos aleatorios para los activos seleccionados.
         
         Parameters:
-        num_combinations (int): Número de combinaciones de pesos a generar por fecha.
+            num_combinations (int): Número de combinaciones de pesos a generar por fecha.
         """
-        if self.selected_assets is None:
-            raise ValueError("Primero debes seleccionar los activos usando 'select_random_assets'.")
-        
         weights_list = []
         for date in self.returns_df.index:
             for _ in range(num_combinations):
@@ -121,9 +123,6 @@ class Sortino:
         """
         Calcula los rendimientos del portafolio para cada combinación de pesos.
         """
-        if self.selected_assets is None or self.weights_df is None:
-            raise ValueError("Debes seleccionar activos y generar pesos antes de calcular rendimientos.")
-        
         portfolio_returns = []
         for _, row in self.weights_df.iterrows():
             date = row["Date"]
@@ -140,7 +139,7 @@ class Sortino:
         Calcula el Ratio de Sortino para cada combinación de pesos.
         
         Parameters:
-        risk_free_rate (float): Tasa libre de riesgo anualizada (default: 2%).
+            risk_free_rate (float): Tasa libre de riesgo anualizada (default: 2%).
         """
         if "Portfolio_Returns" not in self.weights_df.columns:
             raise ValueError("Debes calcular los rendimientos del portafolio antes de calcular el Ratio de Sortino.")
@@ -154,7 +153,6 @@ class Sortino:
             downside_returns = self.weights_df[self.weights_df["Portfolio_Returns"] < (risk_free_rate / 252)]["Portfolio_Returns"]
             downside_deviation = downside_returns.std() if not downside_returns.empty else np.nan
             
-            # Calcular el Ratio de Sortino
             sortino_ratio = excess_return / downside_deviation if downside_deviation != 0 else np.nan
             sortino_ratios.append(sortino_ratio)
         
@@ -167,12 +165,13 @@ class Sortino:
         y Ratios de Sortino.
         
         Returns:
-        pd.DataFrame: DataFrame con la información del portafolio.
+            pd.DataFrame: DataFrame con la información del portafolio.
         """
         if "Sortino_Ratio" not in self.weights_df.columns:
             raise ValueError("Debes calcular los rendimientos y el Ratio de Sortino antes de crear el dataset.")
         
         return self.weights_df
+
 
 class MarketFeaturesReplicator:
     def __init__(self, filepath, replication_factor=100):
