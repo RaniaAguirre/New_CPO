@@ -21,38 +21,28 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 
 class Data:
-    def __init__(self, tickers=None):
-        self.tickers = tickers or []  # Inicializa tickers con la lista proporcionada o una lista vacía
+    def __init__(self):
+        self.tickers = []  # Lista de tickers inicialmente vacía
         self.fecha_inicio = None
         self.fecha_fin = None
 
     def dates(self, fecha_inicio, fecha_fin):
+        """Establece las fechas de inicio y fin."""
         self.fecha_inicio = fecha_inicio
         self.fecha_fin = fecha_fin
 
     def sp500(self, url="https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"):
+        """Carga los tickers del S&P500 desde Wikipedia y selecciona los primeros 100."""
         try:
             table = pd.read_html(url)[0]
-            self.tickers = table['Symbol'].tolist()
+            self.tickers = table['Symbol'].tolist()[:100]  # Solo los primeros 100 tickers
         except Exception as e:
             print(f"Error al obtener la lista de tickers: {e}")
 
-    def sp100(self):
+    def prices(self):
+        """Descarga los datos de precios de los tickers cargados."""
         if not self.tickers:
-            raise ValueError("Primero debes cargar los tickers del S&P500 usando sp500().")
-        return self.tickers[:100]
-    
-    def choose_random_tickers(self, num=15):
-        """
-        Selecciona num tickers aleatorios a partir de los primeros 100 tickers del S&P500.
-        """
-        sp100_tickers = self.sp100()
-        selected = np.random.choice(sp100_tickers, size=num, replace=False).tolist()
-        self.tickers = selected
-
-    def datadownload(self):
-        if not self.tickers:
-            raise ValueError("Debes proporcionar al menos un ticker.")
+            raise ValueError("No hay tickers disponibles para descargar.")
         if not self.fecha_inicio or not self.fecha_fin:
             raise ValueError("Debes establecer las fechas de inicio y fin.")
 
@@ -62,42 +52,69 @@ class Data:
                 data = yf.download(ticker, start=self.fecha_inicio, end=self.fecha_fin)
                 # Seleccionar solo la columna 'Close' y renombrarla para evitar conflictos
                 data = data[['Close']].rename(columns={'Close': ticker})
-                data = data.resample('ME').last()
+                data = data.resample('ME').last()  # Resamplear a fin de mes
                 datos.append(data)
             except Exception as e:
                 print(f"Error al descargar datos para {ticker}: {e}")
 
         if not datos:
-            return None
+            raise ValueError("No se pudieron descargar datos para ningún ticker.")
 
-        df_combinado = pd.concat(datos, axis=1) # Concatenar a lo ancho para tener tickers como columnas
+        # Concatenar todos los datos en un DataFrame combinado
+        df_combinado = pd.concat(datos, axis=1)
+
+        # Eliminar columnas con más de 100 datos faltantes
+        df_combinado = df_combinado.loc[:, df_combinado.isnull().sum() <= 100]
+
         return df_combinado
 
+    def random(self, df_precios, num=15):
+        """Selecciona aleatoriamente 'num' activos del DataFrame de precios."""
+        if df_precios.empty:
+            raise ValueError("El DataFrame de precios está vacío.")
+        if num > len(df_precios.columns):
+            raise ValueError(f"No hay suficientes activos disponibles. Máximo: {len(df_precios.columns)}")
 
-    def rend(self, df_precios):
-        if df_precios is None:
-            raise ValueError("Debes proporcionar un DataFrame con precios.")
-        
-        # Calcular rendimientos porcentuales
-        df_rendimientos = df_precios.pct_change(fill_method=None).dropna(how='all') 
-        
-        return df_rendimientos
+        selected_tickers = np.random.choice(df_precios.columns, size=num, replace=False).tolist()
+        return df_precios[selected_tickers]
+
+    def returns(self, df_precios):
+        """Calcula los rendimientos porcentuales diarios."""
+        if df_precios is None or df_precios.empty:
+            raise ValueError("Debes proporcionar un DataFrame con precios válido.")
+        return df_precios.pct_change(fill_method=None).dropna(how='all')
 
 class Sortino:
-    def __init__(self, returns_df, selected_assets=None):
+    def __init__(self, returns_df, rfr_csv_path, selected_assets=None):
         """
         Inicializa la clase con un DataFrame de rendimientos y una lista de activos.
         
         Parameters:
             returns_df (pd.DataFrame): DataFrame con rendimientos históricos (mensuales).
+            rfr_csv_path (str): Ruta al archivo CSV que contiene las tasas libres de riesgo mensuales.
             selected_assets (list, optional): Lista de tickers a utilizar. Si es None, se extraen de returns_df.
         """
         self.returns_df = returns_df
+        
+        # Leer el archivo CSV con las tasas libres de riesgo
+        try:
+            self.rfr_df = pd.read_csv(rfr_csv_path, parse_dates=["Date"])
+            if "Date" not in self.rfr_df.columns or "rfr" not in self.rfr_df.columns:
+                raise ValueError("El archivo CSV debe contener las columnas 'Date' y 'rfr'.")
+            
+            # Asegurar que esté resampleado a fin de mes
+            self.rfr_df = self.rfr_df.set_index("Date").resample("ME").first()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"No se encontró el archivo CSV en la ruta: {rfr_csv_path}")
+        except Exception as e:
+            raise ValueError(f"Error al leer el archivo CSV: {e}")
+        
         # Si no se pasan activos seleccionados, se asume que son las columnas del DataFrame de rendimientos.
         if selected_assets is None:
             self.selected_assets = list(returns_df.columns)
         else:
             self.selected_assets = selected_assets
+        
         self.portfolio_data = None
 
     def generate_multiple_weights(self, num_combinations=1000):
@@ -134,19 +151,25 @@ class Sortino:
         self.weights_df["Portfolio_Returns"] = portfolio_returns
         print("Rendimientos del portafolio calculados para cada combinación de pesos.")
 
-    def calculate_sortino_ratio(self, risk_free_rate=0.02):
+    def calculate_sortino_ratio(self):
         """
-        Calcula el Ratio de Sortino para cada combinación de pesos.
-        
-        Parameters:
-            risk_free_rate (float): Tasa libre de riesgo anualizada (default: 2%).
+        Calcula el Ratio de Sortino para cada combinación de pesos utilizando la tasa libre de riesgo mensual.
         """
         if "Portfolio_Returns" not in self.weights_df.columns:
             raise ValueError("Debes calcular los rendimientos del portafolio antes de calcular el Ratio de Sortino.")
         
         sortino_ratios = []
         for _, row in self.weights_df.iterrows():
+            date = row["Date"]
             portfolio_return = row["Portfolio_Returns"]
+            
+            # Obtener la tasa libre de riesgo correspondiente a la fecha
+            try:
+                risk_free_rate = self.rfr_df.loc[date, "rfr"] / 100  # Convertir a decimal
+            except KeyError:
+                print(f"No se encontró la tasa libre de riesgo para la fecha {date}. Usando NaN.")
+                risk_free_rate = np.nan
+            
             excess_return = portfolio_return - (risk_free_rate / 252)  # Ajuste diario
             
             # Filtrar los rendimientos negativos para calcular la desviación estándar de downside
