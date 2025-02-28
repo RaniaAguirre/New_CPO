@@ -421,7 +421,45 @@ class XGBoostModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
+
+# Función para cargar el dataset
+def load_data(filepath):
+    """
+    Load data from a CSV file with the following structure:
+      - Column 0: Date (ignored for training)
+      - Columns 1 to 10: Asset allocation features
+      - Columns 11 to 30: Market features
+      - Last column: Sortino ratio (target)
+    """
+    df = pd.read_csv(filepath)
+    # Uncomment the next line if you want to convert the first column to datetime
+    # df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
+    # Combine asset allocation and market features into X, drop the date column.
+    X = df.iloc[:, 1:-1].values
+    y = df.iloc[:, -1].values
+    return X, y
+
+# Graficar resultados
+def plot_model_results(models, X_test, y_test):
+    """
+    Plot actual versus predicted Sortino ratio for each model.
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes = axes.flatten()
     
+    for ax, (name, model) in zip(axes, models.items()):
+        preds = model.predict(X_test)
+        ax.scatter(y_test, preds, alpha=0.6, label='Predictions')
+        ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', label='Ideal')
+        ax.set_xlabel("Actual Sortino Ratio")
+        ax.set_ylabel("Predicted Sortino Ratio")
+        ax.set_title(name)
+        ax.legend()
+
+    fig.suptitle("Actual vs. Predicted Sortino Ratio for Each Model")
+    plt.tight_layout()
+    plt.show()
+
 
 class Market_Features:
     def __init__(self):
