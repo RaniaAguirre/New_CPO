@@ -297,10 +297,49 @@ class SortinoSampler:
         
         # Agrupar por fecha y aplicar sample a cada grupo.
         # Se usa replace=False asumiendo que cada grupo tiene al menos n_random filas.
+        
         sampled_df = self.df.groupby(self.date_col, group_keys=False).apply(
-            lambda group: group.sample(n=n_random, random_state=42)
+        lambda group: group.sample(n=min(200, len(group)), replace=False, random_state=42)
         )
         return sampled_df
+    
+    def sample_in_chunks(df, chunk_size=1000, sample_size=200, random_state=42):
+        """
+        Divide el DataFrame en bloques de 'chunk_size' filas y, en cada bloque,
+        selecciona aleatoriamente 'sample_size' filas. Si el bloque tiene menos de 
+        'sample_size' filas, se seleccionan todas las disponibles.
+
+            Parameters:
+            -----------
+            df : pd.DataFrame
+                DataFrame de origen.
+            chunk_size : int, opcional
+                Número de filas que conforman cada bloque. Por defecto es 1000.
+            sample_size : int, opcional
+                Número de filas a muestrear en cada bloque. Por defecto es 200.
+            random_state : int o None, opcional
+                Semilla para el muestreo aleatorio para garantizar reproducibilidad.
+
+            Returns:
+            --------
+            pd.DataFrame
+                DataFrame resultante con las filas muestreadas de cada bloque.
+            """
+        sampled_chunks = []
+        n_rows = len(df)
+
+            # Itera en bloques de 'chunk_size'
+        for start in range(0, n_rows, chunk_size):
+            # Selecciona el bloque actual
+            chunk = df.iloc[start:start + chunk_size]
+            # Define el número de muestras a tomar: 200 o todas si no hay 200 filas
+            n_sample = sample_size if len(chunk) >= sample_size else len(chunk)
+            # Muestrea aleatoriamente sin reemplazo
+        sampled_chunk = chunk.sample(n=n_sample, random_state=random_state)
+        sampled_chunks.append(sampled_chunk)
+
+        # Concatena todos los bloques muestreados y restablece el índice
+        return pd.concat(sampled_chunks).reset_index(drop=True)
 
 
 #General model class 
