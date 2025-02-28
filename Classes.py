@@ -361,6 +361,8 @@ class BasePortfolioModel(ABC):
         r2 = r2_score(y_test, preds)
         print(f"Evaluation -- MSE: {mse:.4f}, R2: {r2:.4f}")
         return mse, r2
+    
+
 # Linear Regression Model   
 class LinearRegressionModel(BasePortfolioModel):
     def __init__(self):
@@ -421,28 +423,6 @@ class XGBoostModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
-
-# Graficar resultados
-def plot_model_results(models, X_test, y_test):
-    """
-    Plot actual versus predicted Sortino ratio for each model.
-    """
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    axes = axes.flatten()
-    
-    for ax, (name, model) in zip(axes, models.items()):
-        preds = model.predict(X_test)
-        ax.scatter(y_test, preds, alpha=0.6, label='Predictions')
-        ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', label='Ideal')
-        ax.set_xlabel("Actual Sortino Ratio")
-        ax.set_ylabel("Predicted Sortino Ratio")
-        ax.set_title(name)
-        ax.legend()
-
-    fig.suptitle("Actual vs. Predicted Sortino Ratio for Each Model")
-    plt.tight_layout()
-    plt.show()
-
 
 class Market_Features:
     def __init__(self):
