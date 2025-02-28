@@ -385,12 +385,14 @@ class NeuralNetworkModel(BasePortfolioModel):
         self.model = self._build_model()
 
     def _build_model(self):
-        model = Sequential()
-        model.add(Dense(self.hidden_units, input_dim=self.input_dim, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(1))  # Output layer for regression
+        model = Sequential([
+            Input(shape=(self.input_dim,)),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(1)  # Output layer for regression
+        ])
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
         return model
 
