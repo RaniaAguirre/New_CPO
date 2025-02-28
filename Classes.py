@@ -435,7 +435,7 @@ def load_data(filepath):
     # Uncomment the next line if you want to convert the first column to datetime
     # df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
     # Combine asset allocation and market features into X, drop the date column.
-    X = df.iloc[:, 1:-1].values
+    X = df.iloc[:, 0:-1].values
     y = df.iloc[:, -1].values
     return X, y
 
