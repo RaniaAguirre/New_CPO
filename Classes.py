@@ -422,23 +422,6 @@ class XGBoostModel(BasePortfolioModel):
     def predict(self, X):
         return self.model.predict(X)
 
-# Función para cargar el dataset
-def load_data(filepath):
-    """
-    Load data from a CSV file with the following structure:
-      - Column 0: Date (ignored for training)
-      - Columns 1 to 10: Asset allocation features
-      - Columns 11 to 30: Market features
-      - Last column: Sortino ratio (target)
-    """
-    df = pd.read_csv(filepath)
-    # Uncomment the next line if you want to convert the first column to datetime
-    # df.iloc[:, 0] = pd.to_datetime(df.iloc[:, 0])
-    # Combine asset allocation and market features into X, drop the date column.
-    X = df.iloc[:, 0:-1].values
-    y = df.iloc[:, -1].values
-    return X, y
-
 # Graficar resultados
 def plot_model_results(models, X_test, y_test):
     """
