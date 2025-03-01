@@ -361,6 +361,8 @@ class BasePortfolioModel(ABC):
         r2 = r2_score(y_test, preds)
         print(f"Evaluation -- MSE: {mse:.4f}, R2: {r2:.4f}")
         return mse, r2
+    
+
 # Linear Regression Model   
 class LinearRegressionModel(BasePortfolioModel):
     def __init__(self):
@@ -383,12 +385,14 @@ class NeuralNetworkModel(BasePortfolioModel):
         self.model = self._build_model()
 
     def _build_model(self):
-        model = Sequential()
-        model.add(Dense(self.hidden_units, input_dim=self.input_dim, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(self.hidden_units, activation='relu'))
-        model.add(Dense(1))  # Output layer for regression
+        model = Sequential([
+            Input(shape=(self.input_dim,)),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(self.hidden_units, activation='relu'),
+            Dense(1)  # Output layer for regression
+        ])
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
         return model
 
@@ -421,7 +425,6 @@ class XGBoostModel(BasePortfolioModel):
 
     def predict(self, X):
         return self.model.predict(X)
-    
 
 class Market_Features:
     def __init__(self):
