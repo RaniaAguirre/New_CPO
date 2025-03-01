@@ -303,7 +303,7 @@ class SortinoSampler:
         )
         return sampled_df
     
-    def sample_in_chunks(df, chunk_size=1000, sample_size=200, random_state=42):
+    def sample_in_chunks(df, chunk_size=1000, sample_size=300, random_state=42):
         """
         Divide el DataFrame en bloques de 'chunk_size' filas y, en cada bloque,
         selecciona aleatoriamente 'sample_size' filas. Si el bloque tiene menos de 
