@@ -84,6 +84,44 @@ class Data:
             raise ValueError("Debes proporcionar un DataFrame con precios válido.")
         return df_precios.pct_change(fill_method=None).dropna(how='all')
 
+    def load_prices_from_csv(self, csv_path):
+        """
+        Carga datos de precios desde un CSV pre-descargado.
+        
+        Args:
+            csv_path (str): Ruta al archivo CSV con los precios históricos.
+            
+        Returns:
+            pd.DataFrame: DataFrame con los precios procesados.
+        """
+        try:
+            # Cargar CSV con fechas como índice
+            df = pd.read_csv(csv_path, parse_dates=['Date'], index_col='Date')
+            
+            # Filtrar por fechas si ya están definidas
+            if self.fecha_inicio and self.fecha_fin:
+                df = df.loc[self.fecha_inicio:self.fecha_fin]
+            
+            # Resamplear a fin de mes (si no está hecho)
+            df = df.resample('ME').last()
+            
+            # Eliminar columnas con más de 100 NaNs
+            df = df.loc[:, df.isnull().sum() <= 100]
+            
+            # Actualizar tickers y fechas
+            self.tickers = df.columns.tolist()
+            
+            # Si no se definieron fechas, usar las del CSV
+            if not self.fecha_inicio:
+                self.fecha_inicio = df.index.min()
+            if not self.fecha_fin:
+                self.fecha_fin = df.index.max()
+            
+            return df
+        except Exception as e:
+            print(f"Error al cargar el CSV: {e}")
+            return pd.DataFrame()
+
 class Sortino:
     def __init__(self, returns_df, rfr_csv_path, selected_assets=None):
         """
