@@ -28,9 +28,9 @@ X_train, X_temp, y_train, y_temp = train_test_split(X_scaled, y, test_size=0.3, 
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
 # Define hyperparameter grid
-learning_rates = [0.001, 0.01, 0.1]
-epochs_list = [50, 100, 200]
-batch_sizes = [16, 32, 64]
+learning_rates = [0.01, 0.1]
+epochs_list = [25, 50]
+batch_sizes = [32, 64]
 
 results = []
 
@@ -38,7 +38,7 @@ results = []
 for lr, epochs, batch_size in itertools.product(learning_rates, epochs_list, batch_sizes):
     model = Sequential([
         Input(shape=(X_train.shape[1],)),
-        Dense(64, activation='relu'),
+        Dense(32, activation='relu'),
         Dense(32, activation='relu'),
         Dense(16, activation='relu'),
         Dense(1, activation='linear')
