@@ -428,7 +428,6 @@ class NeuralNetworkModel(BasePortfolioModel):
             Dense(self.hidden_units, activation='relu'),
             Dense(self.hidden_units, activation='relu'),
             Dense(self.hidden_units, activation='relu'),
-            Dense(self.hidden_units, activation='relu'),
             Dense(1)  # Output layer for regression
         ])
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
