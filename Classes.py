@@ -414,9 +414,8 @@ class LinearRegressionModel(BasePortfolioModel):
         return self.model.predict(X)
 # NN model  
 class NeuralNetworkModel(BasePortfolioModel):
-    def __init__(self, input_dim, hidden_units=64, learning_rate=0.001, epochs=50, batch_size=32):
+    def __init__(self, input_dim, learning_rate=0.01, epochs=50, batch_size=32):
         self.input_dim = input_dim
-        self.hidden_units = hidden_units
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.batch_size = batch_size
@@ -425,9 +424,9 @@ class NeuralNetworkModel(BasePortfolioModel):
     def _build_model(self):
         model = Sequential([
             Input(shape=(self.input_dim,)),
-            Dense(self.hidden_units, activation='relu'),
-            Dense(self.hidden_units, activation='relu'),
-            Dense(self.hidden_units, activation='relu'),
+            Dense(hidden_units=64, activation='relu'),
+            Dense(hidden_units=32, activation='relu'),
+            Dense(hidden_units=16, activation='relu'),
             Dense(1)  # Output layer for regression
         ])
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
