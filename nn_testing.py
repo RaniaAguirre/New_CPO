@@ -11,11 +11,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Load your dataset
-file_path = "sampled_data.csv"  # Change this to your actual file path
+# Dataset
+file_path = "sampled_data.csv"  
 df = pd.read_csv(file_path)
 
-# Preprocess data
+
 df = df.drop(columns=['Unnamed: 0', 'Date', 'Portfolio_Returns'])
 X = df.drop(columns=['Sortino_Ratio'])
 y = df['Sortino_Ratio']
@@ -46,18 +46,21 @@ for lr, epochs, batch_size in itertools.product(learning_rates, epochs_list, bat
     
     model.compile(optimizer=Adam(learning_rate=lr), loss='mse')
     
-    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0)
+    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
+                        validation_data=(X_val, y_val), verbose=0)
     
+    # Evaluate on test set
     preds = model.predict(X_test).flatten()
     mse = mean_squared_error(y_test, preds)
     r2 = r2_score(y_test, preds)
     
+    # Store results
     results.append({'learning_rate': lr, 'epochs': epochs, 'batch_size': batch_size, 'mse': mse, 'r2': r2})
 
-# Convert results to DataFrame
+
 results_df = pd.DataFrame(results)
 
-# Visualization
+# Plots
 plt.figure(figsize=(12, 6))
 sns.scatterplot(data=results_df, x='epochs', y='mse', hue='learning_rate', size='batch_size', palette='viridis', sizes=(50, 200))
 plt.title("Effect of Hyperparameters on MSE")
@@ -74,5 +77,4 @@ plt.ylabel("R² Score")
 plt.legend(title="Learning Rate & Batch Size")
 plt.show()
 
-# Display results
 print(results_df)
