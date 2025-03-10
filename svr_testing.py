@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 # Dataset
 file_path = "sampled_data.csv"
-df = pd.read_csv(file_path)
+df = pd.read_csv(file_path, low_memory=False)
 
 df = df.drop(columns=['Unnamed: 0', 'Date', 'Portfolio_Returns'])
 X = df.drop(columns=['Sortino_Ratio'])
