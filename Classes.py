@@ -234,6 +234,72 @@ class Sortino:
         return self.weights_df
 
 
+class SharpeCalculatorUnified:
+    def __init__(self, dataset_csv_path):
+        """
+        Inicializa la clase cargando un único dataset que ya contiene las combinaciones de pesos,
+        los rendimientos del portafolio, el ratio de Sortino y la tasa libre de riesgo.
+
+        Parameters:
+            dataset_csv_path (str): Ruta del CSV que contiene el dataset.
+                                    Se espera que tenga las columnas:
+                                        - 'Date'
+                                        - 'Portfolio_Returns'
+                                        - 'rfr' (tasa libre de riesgo en porcentaje)
+        """
+        self.dataset = pd.read_csv(dataset_csv_path, parse_dates=["Date"])
+        # Verificar que el dataset tenga las columnas requeridas
+        required_columns = {"Date", "Portfolio_Returns", "rfr"}
+        if not required_columns.issubset(self.dataset.columns):
+            raise ValueError(f"El dataset debe contener las columnas: {required_columns}")
+
+    def calculate_sharpe_ratio(self):
+        """
+        Calcula el ratio de Sharpe para cada combinación de pesos usando el dataset cargado.
+        
+        Para cada fila se agrupan los retornos del portafolio por fecha para obtener la desviación
+        estándar (volatilidad total) de ese día. Luego se calcula:
+        
+            Exceso de rendimiento = Portfolio_Returns - (rfr / 100 / 252)
+            Sharpe Ratio = Exceso de rendimiento / (desviación estándar del grupo del día)
+        
+        Returns:
+            pd.DataFrame: Dataset actualizado con una nueva columna "Sharpe_Ratio".
+        """
+        df = self.dataset.copy()
+        
+        # Calcular la desviación estándar de los rendimientos del portafolio para cada fecha
+        df["group_std"] = df.groupby("Date")["Portfolio_Returns"].transform("std")
+        
+        sharpe_ratios = []
+        for idx, row in df.iterrows():
+            portfolio_return = row["Portfolio_Returns"]
+            # Convertir la tasa libre de riesgo de porcentaje a decimal y ajustarla a base diaria
+            daily_rfr = (row["rfr"] / 100) / 252
+            
+            # Calcular el exceso de rendimiento
+            excess_return = portfolio_return - daily_rfr
+            
+            group_std = row["group_std"]
+            sharpe = excess_return / group_std if group_std != 0 else np.nan
+            sharpe_ratios.append(sharpe)
+        
+        df["Sharpe_Ratio"] = sharpe_ratios
+        # Eliminar la columna temporal
+        df.drop(columns=["group_std"], inplace=True)
+        
+        self.dataset = df
+        return self.dataset
+
+    def get_dataset(self):
+        """
+        Devuelve el dataset actualizado con el ratio de Sharpe calculado.
+        
+        Returns:
+            pd.DataFrame: Dataset con la columna "Sharpe_Ratio".
+        """
+        return self.dataset
+
 class MarketFeaturesReplicator:
     def __init__(self, filepath, replication_factor=100):
         """
