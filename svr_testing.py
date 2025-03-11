@@ -24,9 +24,9 @@ X_train, X_temp, y_train, y_temp = train_test_split(X_scaled, y, test_size=0.3, 
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
 # Define hyperparameter grid
-C_values = [1, 5, 10]
-epsilon_values = [0.01, 0.1, 0.5]
-kernel_types = [ 'rbf', 'poly']
+C_values = [1, 3, 5, 7, 10]  
+epsilon_values = [0.01, 0.05, 0.1, 0.2, 0.3]
+kernel_types = ['rbf', 'poly']
 
 results = []
 
