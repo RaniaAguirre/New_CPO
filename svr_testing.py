@@ -1,4 +1,3 @@
-import itertools
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,31 +22,26 @@ X_scaled = scaler.fit_transform(X)
 X_train, X_temp, y_train, y_temp = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
-# Define hyperparameter grid
-C_values = [1, 3, 5, 7, 10]  
-epsilon_values = [0.01, 0.05, 0.1, 0.2, 0.3]
-kernel_types = ['rbf', 'poly']
+# Define singular hyperparameter values
+C_value = 10
+epsilon = 0.01
+kernel = 'rbf'
 
-results = []
+# Train SVR model with specified parameters
+model = SVR(kernel=kernel, C=C_value, epsilon=epsilon)
+model.fit(X_train, y_train)
 
-# Grid search over hyperparameters
-for C, epsilon, kernel in itertools.product(C_values, epsilon_values, kernel_types):
-    model = SVR(kernel=kernel, C=C, epsilon=epsilon)
-    model.fit(X_train, y_train)
-    
-    # Evaluate on test set
-    preds = model.predict(X_test)
-    mse = mean_squared_error(y_test, preds)
-    r2 = r2_score(y_test, preds)
-    
-    # Store results
-    results.append({'C': C, 'epsilon': epsilon, 'kernel': kernel, 'mse': mse, 'r2': r2})
+# Evaluate on test set
+preds = model.predict(X_test)
+mse = mean_squared_error(y_test, preds)
+r2 = r2_score(y_test, preds)
 
-results_df = pd.DataFrame(results)
+# Store results in DataFrame
+results_df = pd.DataFrame([{'C': C_value, 'epsilon': epsilon, 'kernel': kernel, 'mse': mse, 'r2': r2}])
 
 # Plots
 plt.figure(figsize=(12, 6))
-sns.scatterplot(data=results_df, x='C', y='mse', hue='kernel', size='epsilon', palette='viridis', sizes=(50, 200))
+sns.scatterplot(data=results_df, x='C', y='mse', hue='kernel', size='epsilon', palette='viridis', sizes=(100, 200))
 plt.title("Effect of Hyperparameters on MSE")
 plt.xlabel("C")
 plt.ylabel("MSE")
@@ -55,7 +49,7 @@ plt.legend(title="Kernel & Epsilon")
 plt.show()
 
 plt.figure(figsize=(12, 6))
-sns.scatterplot(data=results_df, x='C', y='r2', hue='kernel', size='epsilon', palette='coolwarm', sizes=(50, 200))
+sns.scatterplot(data=results_df, x='C', y='r2', hue='kernel', size='epsilon', palette='coolwarm', sizes=(100, 200))
 plt.title("Effect of Hyperparameters on R² Score")
 plt.xlabel("C")
 plt.ylabel("R² Score")
