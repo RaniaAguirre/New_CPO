@@ -15,6 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
@@ -506,15 +507,22 @@ class NeuralNetworkModel(BasePortfolioModel):
         return self.model.predict(X).flatten()
 # SVR model    
 class SVRModel(BasePortfolioModel):
-    def __init__(self, kernel='rbf', C=1.0, epsilon=0.1):
-        self.model = SVR(kernel=kernel, C=C, epsilon=epsilon)
+    def __init__(self, kernel='rbf', C=10, epsilon=0.01):
+        self.kernel = kernel
+        self.C = C
+        self.epsilon = epsilon
+        self.scaler = StandardScaler()
+        self.model = SVR(kernel=self.kernel, C=self.C, epsilon=self.epsilon)
+        self.results_df = None
 
     def fit(self, X_train, y_train):
-        self.model.fit(X_train, y_train)
+        X_scaled = self.scaler.fit_transform(X_train)
+        self.model.fit(X_scaled, y_train)
         print("SVR model fitted.")
 
     def predict(self, X):
-        return self.model.predict(X)
+        X_scaled = self.scaler.transform(X)
+        return self.model.predict(X_scaled)
 #XGBoost   
 class XGBoostModel(BasePortfolioModel):
     def __init__(self):
