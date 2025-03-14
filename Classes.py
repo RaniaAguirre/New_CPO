@@ -517,17 +517,26 @@ class SVRModel(BasePortfolioModel):
         return self.model.predict(X)
 #XGBoost   
 class XGBoostModel(BasePortfolioModel):
-    def __init__(self, n_estimators=100, max_depth=3, learning_rate=0.1):
-        self.model = xgb.XGBRegressor(n_estimators=n_estimators, max_depth=max_depth,
-                                      learning_rate=learning_rate, objective='reg:squarederror')
+    def __init__(self):
+        self.model = xgb.XGBRegressor(
+            n_estimators=250, 
+            max_depth=4, 
+            learning_rate=0.049221833118794175,
+            subsample=0.8645617337327893,
+            colsample_bytree=0.9129687689033119,
+            gamma=0.08648654064554967,
+            reg_alpha=0.1051912791786866,
+            reg_lambda=0.280839131994105,
+            objective='reg:squarederror'
+        )
 
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
-        print("XGBoost model fitted.")
+        print(" XGBoost optimizado entrenado con éxito.")
 
     def predict(self, X):
         return self.model.predict(X)
-
+    
 class Market_Features:
     def __init__(self):
         pass
