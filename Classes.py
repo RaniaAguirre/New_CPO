@@ -11,14 +11,13 @@ import quantstats as qs
 
 #ML libraries
 from abc import ABC, abstractmethod
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.optimizers import Adam
 
 class Data:
@@ -481,7 +480,7 @@ class LinearRegressionModel(BasePortfolioModel):
         return self.model.predict(X)
 # NN model  
 class NeuralNetworkModel(BasePortfolioModel):
-    def __init__(self, input_dim, learning_rate=0.01, epochs=50, batch_size=32):
+    def __init__(self, input_dim, learning_rate=0.025, epochs=25, batch_size=64):
         self.input_dim = input_dim
         self.learning_rate = learning_rate
         self.epochs = epochs
@@ -491,10 +490,9 @@ class NeuralNetworkModel(BasePortfolioModel):
     def _build_model(self):
         model = Sequential([
             Input(shape=(self.input_dim,)),
-            Dense(hidden_units=64, activation='relu'),
-            Dense(hidden_units=32, activation='relu'),
-            Dense(hidden_units=16, activation='relu'),
-            Dense(1)  # Output layer for regression
+            Dense(32, activation='relu'),
+            Dense(16, activation='relu'),
+            Dense(1, activation='linear')
         ])
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mse')
         return model
@@ -511,18 +509,15 @@ class SVRModel(BasePortfolioModel):
         self.kernel = kernel
         self.C = C
         self.epsilon = epsilon
-        self.scaler = StandardScaler()
         self.model = SVR(kernel=self.kernel, C=self.C, epsilon=self.epsilon)
-        self.results_df = None
+        self.results_df = None  
 
     def fit(self, X_train, y_train):
-        X_scaled = self.scaler.fit_transform(X_train)
-        self.model.fit(X_scaled, y_train)
+        self.model.fit(X_train, y_train) 
         print("SVR model fitted.")
 
     def predict(self, X):
-        X_scaled = self.scaler.transform(X)
-        return self.model.predict(X_scaled)
+        return self.model.predict(X)
 #XGBoost   
 class XGBoostModel(BasePortfolioModel):
     def __init__(self):
