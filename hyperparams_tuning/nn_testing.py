@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Dataset
-file_path = "sampled_data.csv"  
+file_path = "/Users/alexsotomayor/code/PAP/New_CPO/sampled_data.csv"  
 df = pd.read_csv(file_path)
 
 
