@@ -1,257 +1,198 @@
-import yfinance as yf
-import os
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
-import scipy.optimize as sco
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import kurtosis
-import warnings
-import quantstats as qs
+import pickle
 
-class DynamicBacktest:
-    
-    def __init__(self, results, prices, initial_capital, benchmark_data=None, benchmark_ticker='^GSPC'):
+class BacktestMultiStrategy:
+    def __init__(self, data, svr_models, xgboost_model, initial_capital=1000000):
         """
-        Inicializa la clase con los parámetros dados y descarga el benchmark solo si no se proporciona.
-        
-        Args:
-        - results: DataFrame con columnas ['Date', 'Chosen Universe', 'Selected Stocks']
-        - prices: Diccionario con tickers como claves y series de pandas con precios como valores.
-        - initial_capital: Capital inicial para el portafolio.
-        - benchmark_data: Serie de tiempo opcional con los precios del benchmark.
-        - benchmark_ticker: Ticker del benchmark para descargar si no se proporciona data.
+        data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
+              debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
+        svr_models: dict con modelos SVR {'high_cap': model, 'mid_cap': model, 'low_cap': model}
+        xgboost_model: modelo CPO original
+        initial_capital: capital inicial para el portafolio
         """
-        self.results = results
-        self.prices = prices
+        self.data = data
+        self.svr_models = svr_models
+        self.xgboost_model = xgboost_model
         self.initial_capital = initial_capital
-        self.portfolio_values_sortino = []
-        self.portfolio_values_benchmark = []
-        self.weights_history_sortino = []
 
-        self.benchmark_data = benchmark_data if benchmark_data is not None else self.download_benchmark_data(benchmark_ticker)
-        self.benchmark_data.index = pd.to_datetime(self.benchmark_data.index)
+        self.start_date = pd.to_datetime('2015-01-01')
+        self.end_date = pd.to_datetime('2025-01-01')
+        self.training_period = pd.to_datetime('2014-01-01')
 
-        self.benchmark_shares = None
+        self.results = {
+            'SVR-CPO': [],
+            'XGBoost-CPO': [],
+            'EqualWeight': [],
+            'MinVar': [],
+            'MaxSharpe': []
+        }
 
-        warnings.filterwarnings("ignore", category=RuntimeWarning, 
-                                message="Values in x were outside bounds during a minimize step, clipping to bounds")
+    def simulate(self):
+        rebalance_dates = pd.date_range(self.start_date, self.end_date, freq='12MS')
+        strategies = list(self.results.keys())
+        portfolio_values = {s: [self.initial_capital] for s in strategies}
 
-        self.run_backtest()
+        for i in range(len(rebalance_dates) - 1):
+            date = rebalance_dates[i]
+            next_date = rebalance_dates[i + 1]
 
-    def download_benchmark_data(self, ticker):
-        """
-        Descarga los datos históricos del benchmark usando yfinance.
-        """
-        benchmark_df = yf.download(ticker, start=self.results['Date'].min(), end=self.results['Date'].max(), progress=False)
-        return benchmark_df['Adj Close']
+            train_start = date - pd.DateOffset(years=1)
+            train_end = date
 
-    def calculate_sortino_weights(self, selected_stocks, end_date):
-        """
-        Calcula los pesos óptimos basados en el ratio Sortino.
-        """
-        start_date = end_date - pd.DateOffset(days=365)
-        returns = pd.DataFrame({
-            ticker: self.prices[ticker].loc[start_date:end_date].pct_change().dropna() 
-            for ticker in selected_stocks if ticker in self.prices
-        }).dropna(axis=1)
+            selected_assets = self.select_assets(date)
+            cap_type = self.get_cap_type(date)
 
-        def sortino_ratio(weights):
-            portfolio_return = np.sum(returns.mean() * weights) * 252
-            downside_std = np.sqrt(np.sum((returns[returns < 0].fillna(0).mean() * weights) ** 2) * 252)
-            return -portfolio_return / downside_std if downside_std != 0 else np.inf
+            if not selected_assets:
+                continue
 
-        n = len(returns.columns)
-        constraints = ({'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1})
-        bounds = tuple((0.05, 1) for _ in range(n))
-        initial_weights = n * [1. / n,]
+            weights_dict = {
+                'SVR-CPO': self.allocate_svr(selected_assets, date, cap_type),
+                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date),
+                'EqualWeight': self.equal_weight(selected_assets),
+                'MinVar': self.min_var(selected_assets, date),
+                'MaxSharpe': self.max_sharpe(selected_assets, date)
+            }
 
-        optimized = sco.minimize(sortino_ratio, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
-        return {ticker: optimized.x[i] for i, ticker in enumerate(returns.columns)}
+            prices = self.data.loc[:, ('Price', selected_assets)]
+            returns = prices.pct_change().loc[date:next_date].dropna()
 
-    def calculate_semivariance_weights(self, selected_stocks, end_date):
-        """
-        Calcula los pesos óptimos minimizando la semivarianza del portafolio.
-        """
-        start_date = end_date - pd.DateOffset(days=365)
-        returns = pd.DataFrame({
-            ticker: self.prices[ticker].loc[start_date:end_date].pct_change().dropna()
-            for ticker in selected_stocks if ticker in self.prices
-        }).dropna(axis=1)
-    
-        def semivariance_loss(weights):
-            portfolio_return = np.dot(returns, weights)
-            downside_returns = portfolio_return[portfolio_return < 0]
-            semivariance = np.mean(downside_returns ** 2)  # Semivarianza
-            return semivariance
-    
-        n = len(returns.columns)
-        constraints = ({'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1})
-        bounds = tuple((0.05, 1) for _ in range(n))
-        initial_weights = n * [1. / n,]
-    
-        optimized = sco.minimize(semivariance_loss, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
-        return {ticker: optimized.x[i] for i, ticker in enumerate(returns.columns)}
-    
-    def rebalance_portfolios(self, capital, selected_stocks, universe_type, date):
-        """
-        Realiza el rebalanceo utilizando Sortino para ofensivo y semivarianza para defensivo.
-        """
-        if universe_type == 'Offensive':
-            weights = self.calculate_sortino_weights(selected_stocks, date)
-        else:
-            weights = self.calculate_semivariance_weights(selected_stocks, date)
-    
-        prices_at_rebalance = {ticker: self.prices[ticker].asof(date) for ticker in selected_stocks}
-        shares = {ticker: (capital * weights[ticker]) / prices_at_rebalance[ticker] for ticker in selected_stocks}
-        return shares, weights
+            for strategy in strategies:
+                weights = weights_dict[strategy]
+                weight_vec = np.array([weights[a] for a in selected_assets])
+                strat_returns = returns.dot(weight_vec)
+                cumulative = np.prod(1 + strat_returns)
+                new_value = portfolio_values[strategy][-1] * cumulative
+                portfolio_values[strategy].append(new_value)
 
-    
-    def run_backtest(self):
-        """
-        Ejecuta el backtest, manejando portafolios y benchmark.
-        """
-        capital = self.initial_capital
-        rebalance_dates = pd.to_datetime(self.results['Date'].tolist())
-        start_date = rebalance_dates[0]
-        selected_stocks = self.results.iloc[0]['Selected Stocks']
-        universe_type = self.results.iloc[0]['Chosen Universe']
+        for strategy in strategies:
+            self.results[strategy] = portfolio_values[strategy]
 
-        shares, weights = self.rebalance_portfolios(capital, selected_stocks, universe_type, start_date)
-        self.weights_history_sortino.append((start_date, weights))
-        benchmark_initial_price = self.benchmark_data.asof(start_date)
-        self.benchmark_shares = self.initial_capital / benchmark_initial_price
+    def select_assets(self, date):
+        return []
 
-        all_dates = pd.date_range(start_date, self.benchmark_data.index[-1])
-        for current_date in all_dates:
-            if current_date in rebalance_dates:
-                idx = rebalance_dates.get_loc(current_date)
-                capital = self.calculate_portfolio_value(shares, selected_stocks, current_date)
-                selected_stocks = self.results.iloc[idx]['Selected Stocks']
-                universe_type = self.results.iloc[idx]['Chosen Universe']
-                shares, weights = self.rebalance_portfolios(capital, selected_stocks, universe_type, current_date)
-                self.weights_history_sortino.append((current_date, weights))
+    def get_cap_type(self, date):
+        return 'high_cap'
 
-            daily_value = self.calculate_portfolio_value(shares, selected_stocks, current_date)
-            daily_value_benchmark = self.benchmark_shares * self.benchmark_data.asof(current_date)
+    def allocate_svr(self, assets, date, cap_type, n_samples=1000):
+        model = self.svr_models[cap_type]
+        indicators = self.data.loc[date, ('Indicator', slice(None))].values
+        candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
 
-            self.portfolio_values_sortino.append((current_date, daily_value))
-            self.portfolio_values_benchmark.append((current_date, daily_value_benchmark))
+        best_score = -np.inf
+        best_weights = None
 
-    
-    def calculate_portfolio_value(self, shares, selected_stocks, date):
-        """
-        Calcula el valor del portafolio para la fecha dada.
-        """
-        return sum(shares.get(ticker, 0) * self.prices[ticker].asof(date) for ticker in selected_stocks)
+        for w in candidate_weights:
+            features = np.concatenate([w, indicators])
+            score = model.predict([features])[0]
+            if score > best_score:
+                best_score = score
+                best_weights = w
 
+        return dict(zip(assets, best_weights))
 
-    def get_portfolio_values(self):
-        sortino_df = pd.DataFrame(self.portfolio_values_sortino, columns=['Date', 'Sortino Portfolio Value'])
-        benchmark_df = pd.DataFrame(self.portfolio_values_benchmark, columns=['Date', 'Benchmark Portfolio Value'])
-        
-        # Convertir 'Date' a datetime e indexar
-        sortino_df['Date'] = pd.to_datetime(sortino_df['Date'])
-        sortino_df.set_index('Date', inplace=True)
-        benchmark_df['Date'] = pd.to_datetime(benchmark_df['Date'])
-        benchmark_df.set_index('Date', inplace=True)
-        
-        # Generar un rango completo de fechas para asegurar la continuidad
-        all_dates = pd.date_range(start=sortino_df.index.min(), end=sortino_df.index.max(), freq='D')
-        sortino_df = sortino_df.reindex(all_dates).ffill().bfill()
-        benchmark_df = benchmark_df.reindex(all_dates).ffill().bfill()
-        
-        # Combinar y rellenar posibles NaN resultantes de la intersección de fechas
-        portfolio_values_df = sortino_df.join(benchmark_df, how='inner')
-        portfolio_values_df.ffill(inplace=True)
-        
-        return portfolio_values_df
+    def allocate_xgboost(self, assets, date, n_samples=1000):
+        model = self.xgboost_model
+        indicators = self.data.loc[date, ('Indicator', slice(None))].values
+        candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
 
+        best_score = -np.inf
+        best_weights = None
 
-    def get_portfolio_series(self):
-        """
-        Convierte los valores del portafolio en una serie temporal.
-        """
-        sortino_df = pd.DataFrame(self.portfolio_values_sortino, columns=['Date', 'Sortino Portfolio Value'])
-        sortino_df.set_index('Date', inplace=True)
-        return sortino_df['Sortino Portfolio Value']
+        for w in candidate_weights:
+            features = np.concatenate([w, indicators])
+            score = model.predict([features])[0]
+            if score > best_score:
+                best_score = score
+                best_weights = w
 
-    def plot_strategies(self):
-        """
-        Grafica la evolución de los portafolios y el benchmark.
-        """
-        portfolio_values_df = self.get_portfolio_values()
-        
-        # Graficar usando el índice de fechas
-        plt.figure(figsize=(14, 7))
-        plt.plot(portfolio_values_df.index, portfolio_values_df['Sortino Portfolio Value'], label='Sortino Portfolio')
-        plt.plot(portfolio_values_df.index, portfolio_values_df['Benchmark Portfolio Value'], label='Benchmark', color='red', linewidth=2)
-        plt.title('Evolución del Portafolio y Benchmark')
-        plt.xlabel('Fecha')
-        plt.ylabel('Valor del Portafolio')
+        return dict(zip(assets, best_weights))
+
+    def sample_weight_combinations(self, n_assets, n_samples):
+        return np.random.dirichlet(np.ones(n_assets), size=n_samples)
+
+    def equal_weight(self, assets):
+        n = len(assets)
+        return {a: 1/n for a in assets} if n > 0 else {}
+
+    def min_var(self, assets, date):
+        prices = self.data.loc[:date, ('Price', assets)].dropna()
+        returns = prices.pct_change().dropna()
+        cov_matrix = returns.cov()
+        weights = self.min_variance_portfolio_analytical(cov_matrix)
+        return dict(zip(assets, weights))
+
+    def max_sharpe(self, assets, date, risk_free_rate=0.01):
+        prices = self.data.loc[:date, ('Price', assets)].dropna()
+        returns = prices.pct_change().dropna()
+        mean_returns = returns.mean() * 12
+        cov_matrix = returns.cov() * 12
+        weights = self.max_sharpe_portfolio_analytical(mean_returns.values, cov_matrix.values, risk_free_rate)
+        return dict(zip(assets, weights))
+
+    def min_variance_portfolio_analytical(self, cov_matrix):
+        inv_cov = np.linalg.inv(cov_matrix)
+        ones = np.ones(len(cov_matrix))
+        return np.dot(inv_cov, ones) / np.dot(ones, np.dot(inv_cov, ones))
+
+    def max_sharpe_portfolio_analytical(self, expected_returns, cov_matrix, risk_free_rate):
+        inv_cov = np.linalg.inv(cov_matrix)
+        ones = np.ones(len(cov_matrix))
+        excess_returns = expected_returns - risk_free_rate * ones
+        num = np.dot(inv_cov, excess_returns)
+        denom = np.dot(ones.T, num)
+        return num / denom
+
+    def normalize_weights(self, weight_dict):
+        total = sum(weight_dict.values())
+        return {k: v / total for k, v in weight_dict.items()} if total != 0 else weight_dict
+
+    def plot_results(self):
+        import seaborn as sns
+
+        # Línea de evolución total
+        plt.figure(figsize=(10, 5))
+        for strategy, values in self.results.items():
+            plt.plot(values, label=strategy)
+        plt.title('Evolución del valor del portafolio (2015-2025)')
+        plt.xlabel('Rebalanceos anuales')
+        plt.ylabel('Valor del portafolio')
         plt.legend()
-        plt.grid()
+        plt.grid(True)
         plt.show()
 
+        # Boxplot de rendimientos anuales
+        annual_returns = {}
+        for strategy, values in self.results.items():
+            returns = np.diff(values) / values[:-1]
+            annual_returns[strategy] = returns
 
-    def evaluate_portfolios(self):
-        """
-        Calcula métricas clave de comparación entre el portafolio y el benchmark,
-        con control adicional para valores extremos y supresión de advertencias de overflow.
-        
-        Returns:
-            metrics_df (pd.DataFrame): DataFrame con las métricas calculadas para el portafolio y el benchmark.
-        """
-        # Configuración temporal para ignorar advertencias de overflow en numpy
-        old_settings = np.seterr(over='ignore')
-    
-        try:
-            # Obtener series de portafolio y benchmark sin límites para Beta y Alpha
-            port_series = self.get_portfolio_series()
-            benchmark_data = self.benchmark_data
-    
-            # Asegurar que ambos están alineados en frecuencia semanal para mayor estabilidad
-            strategy_weekly = port_series.resample('W').last().pct_change().dropna()
-            benchmark_weekly = benchmark_data.resample('W').last().pct_change().dropna()
-    
-            # Alinear fechas de ambos retornos semanales
-            aligned_returns = pd.DataFrame({'Strategy': strategy_weekly, 'Benchmark': benchmark_weekly}).dropna()
-    
-            # Calcular métricas clave usando quantstats para el portafolio
-            metrics = {
-                'CAGR': qs.stats.cagr(port_series),
-                'Sharpe Ratio': qs.stats.sharpe(port_series),
-                'Sortino Ratio': qs.stats.sortino(port_series),
-                'Max Drawdown': qs.stats.max_drawdown(port_series),
-                'Volatility': qs.stats.volatility(port_series),
-                'VaR (5%)': qs.stats.value_at_risk(port_series)
-            }
-    
-            # Calcular Alpha y Beta manualmente con datos semanales alineados
-            try:
-                cov_matrix = aligned_returns.cov()
-                metrics['Beta'] = cov_matrix.loc['Strategy', 'Benchmark'] / cov_matrix.loc['Benchmark', 'Benchmark']
-                metrics['Alpha'] = (aligned_returns['Strategy'].mean() - metrics['Beta'] * aligned_returns['Benchmark'].mean()) * 52  # Anualizar Alpha
-            except Exception as e:
-                print(f"Error calculating Alpha and Beta manually: {e}")
-                metrics['Beta'] = np.nan
-                metrics['Alpha'] = np.nan
-    
-            # Calcular métricas clave para el benchmark, estableciendo Beta en 1 y Alpha en 0
-            benchmark_metrics = {
-                'CAGR': qs.stats.cagr(benchmark_data),
-                'Sharpe Ratio': qs.stats.sharpe(benchmark_data),
-                'Sortino Ratio': qs.stats.sortino(benchmark_data),
-                'Max Drawdown': qs.stats.max_drawdown(benchmark_data),
-                'Volatility': qs.stats.volatility(benchmark_data),
-                'VaR (5%)': qs.stats.value_at_risk(benchmark_data),
-                'Beta': 1,    # Beta fijo para el benchmark
-                'Alpha': 0    # Alpha fijo para el benchmark
-            }
-    
-            metrics_df = pd.DataFrame([metrics, benchmark_metrics], index=['Strategy', 'Benchmark']).T
-            return metrics_df
-    
-        finally:
-            # Restaurar configuración original de numpy
-            np.seterr(**old_settings)
+        df_returns = pd.DataFrame(annual_returns)
+        plt.figure(figsize=(8, 5))
+        sns.boxplot(data=df_returns)
+        plt.title('Distribución de rendimientos anuales por estrategia')
+        plt.ylabel('Rendimiento anual')
+        plt.grid(True)
+        plt.show()
+
+        # Histograma de rendimientos
+        plt.figure(figsize=(10, 6))
+        for strategy in self.results:
+            sns.histplot(df_returns[strategy], kde=True, label=strategy, stat="density", bins=10, alpha=0.5)
+        plt.title('Histogramas de rendimientos anuales por estrategia')
+        plt.xlabel('Rendimiento anual')
+        plt.ylabel('Densidad')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def evaluate(self):
+        cagr_results = {}
+        n_years = (self.end_date - self.start_date).days / 365.25
+        for strategy, values in self.results.items():
+            initial_value = values[0]
+            final_value = values[-1]
+            cagr = (final_value / initial_value) ** (1 / n_years) - 1
+            cagr_results[strategy] = cagr
+        return pd.DataFrame(list(cagr_results.items()), columns=['Metodología', 'CAGR'])
