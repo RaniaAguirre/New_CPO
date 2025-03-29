@@ -77,7 +77,7 @@ class BacktestMultiStrategy:
 
     def allocate_svr(self, assets, date, cap_type, n_samples=1000):
         model = self.svr_models[cap_type]
-        indicators = self.data.loc[date, ('Indicator', slice(None))].values
+        indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
 
         best_score = -np.inf
@@ -94,7 +94,7 @@ class BacktestMultiStrategy:
 
     def allocate_xgboost(self, assets, date, n_samples=1000):
         model = self.xgboost_model
-        indicators = self.data.loc[date, ('Indicator', slice(None))].values
+        indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
 
         best_score = -np.inf
@@ -108,6 +108,7 @@ class BacktestMultiStrategy:
                 best_weights = w
 
         return dict(zip(assets, best_weights))
+
 
     def sample_weight_combinations(self, n_assets, n_samples):
         return np.random.dirichlet(np.ones(n_assets), size=n_samples)
