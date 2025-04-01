@@ -642,22 +642,93 @@ class Market_Features:
         return combined_df
     
 class AssetClassifier:
-    def __init__(self, capitalizations: dict, data: pd.DataFrame, indicators: list = None):
-        self.capitalizations = capitalizations
+    def __init__(self, data: pd.DataFrame, indicators: list = None):
+        """
+        Inicializa la clase de clasificación de activos a partir de precios e indicadores.
+
+        Args:
+            data (pd.DataFrame): DataFrame con columnas de tickers e indicadores.
+            indicators (list, optional): Lista de nombres de columnas que son indicadores de mercado.
+        """
         self.data = data
         self.indicators = indicators or [
             'MOM', 'Treasury Bond 3M', 'WTI index', 'Dollar index', 'TRCCRB',
             'BCI', 'CCI', 'CLI', 'GPRI', 'Unemployment rate'
         ]
 
+        # Detectar tickers: columnas que no son indicadores
+        self.tickers = [col for col in data.columns if col not in self.indicators]
+
+        # Obtener y clasificar por capitalización real
+        raw_caps = self.get_real_market_caps(self.tickers)
+        self.capitalizations = {
+            ticker: self.classify_market_cap(raw_caps[ticker]) for ticker in self.tickers
+        }
+
+    def get_real_market_caps(self, tickers):
+        """
+        Obtiene la capitalización bursátil de una lista de tickers usando yfinance.
+
+        Args:
+            tickers (list): Lista de tickers (str)
+
+        Returns:
+            dict: Diccionario ticker -> market cap
+        """
+        market_caps = {}
+        for ticker in tickers:
+            try:
+                data = yf.Ticker(ticker)
+                cap = data.info.get('marketCap', None)
+                market_caps[ticker] = cap
+            except:
+                market_caps[ticker] = None
+        return market_caps
+
+    def classify_market_cap(self, cap):
+        """
+        Clasifica un valor de market cap como small, mid o high.
+
+        Args:
+            cap (float): Valor de market cap en dólares.
+
+        Returns:
+            str: 'small_cap', 'mid_cap', o 'high_cap'
+        """
+        if cap is None:
+            return 'mid_cap'  # Por defecto
+        elif cap >= 10e9:
+            return 'high_cap'
+        elif cap >= 2e9:
+            return 'mid_cap'
+        else:
+            return 'small_cap'
+
     def select_assets(self, date: pd.Timestamp, n_assets: int = 5):
-        asset_columns = [col for col in self.data.columns if col not in self.indicators]
+        """
+        Selecciona hasta n_assets activos con datos disponibles en la fecha dada.
+
+        Args:
+            date (pd.Timestamp): Fecha objetivo.
+            n_assets (int): Número de activos a seleccionar.
+
+        Returns:
+            list: Lista de tickers seleccionados
+        """
+        asset_columns = self.tickers
         asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
         available_assets = [asset for asset in asset_columns if not pd.isna(self.data.loc[asof_date, asset])]
         return sorted(available_assets)[:n_assets]
 
     def get_cap_type(self, selected_assets: list):
+        """
+        Determina la capitalización predominante de una lista de activos.
+
+        Args:
+            selected_assets (list): Lista de tickers
+
+        Returns:
+            str: Tipo de capitalización dominante
+        """
         caps = [self.capitalizations.get(asset, 'mid_cap') for asset in selected_assets]
         return max(set(caps), key=caps.count)
-    
-    
