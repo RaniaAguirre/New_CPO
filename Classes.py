@@ -640,3 +640,24 @@ class Market_Features:
         """
         combined_df = pd.merge(df1, df2, how='outer', on='Date')
         return combined_df
+    
+class AssetClassifier:
+    def __init__(self, capitalizations: dict, data: pd.DataFrame, indicators: list = None):
+        self.capitalizations = capitalizations
+        self.data = data
+        self.indicators = indicators or [
+            'MOM', 'Treasury Bond 3M', 'WTI index', 'Dollar index', 'TRCCRB',
+            'BCI', 'CCI', 'CLI', 'GPRI', 'Unemployment rate'
+        ]
+
+    def select_assets(self, date: pd.Timestamp, n_assets: int = 5):
+        asset_columns = [col for col in self.data.columns if col not in self.indicators]
+        asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
+        available_assets = [asset for asset in asset_columns if not pd.isna(self.data.loc[asof_date, asset])]
+        return sorted(available_assets)[:n_assets]
+
+    def get_cap_type(self, selected_assets: list):
+        caps = [self.capitalizations.get(asset, 'mid_cap') for asset in selected_assets]
+        return max(set(caps), key=caps.count)
+    
+    
