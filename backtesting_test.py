@@ -1,6 +1,6 @@
 import pandas as pd
 import pickle
-from backtesting import BacktestMultiStrategy
+from Backtesting import BacktestMultiStrategy
 
 # === Cargar el dataset combinado ===
 data = pd.read_csv("Backtesting_data.csv", index_col=0, parse_dates=True)
@@ -14,29 +14,31 @@ price_multi = pd.concat([data[price_cols]], axis=1, keys=["Price"])
 ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
 combined_data = pd.concat([price_multi, ind_multi], axis=1)
 
-# === Cargar modelo SVR ===
-with open("trained_models/Dataset_1_SVR.pkl", "rb") as f:
+# === Cargar modelo SVR (único modelo, lo usaremos para todos los tipos) ===
+with open("trained_models/Dataset_2_SVR.pkl", "rb") as f:
     svr_model = pickle.load(f)
 
-# === Cargar modelo XGBoost entrenado ===
-with open("trained_models/Dataset_1_XGBoost_Sharpe.pkl", "rb") as f:
+# === Cargar modelo XGBoost (único modelo) ===
+with open("trained_models/Dataset_2_XGBoost_Sharpe.pkl", "rb") as f:
     xgboost_model = pickle.load(f)
 
-# Diccionarios para pasar a la clase
-svr_models = {'high_cap': svr_model, 'mid_cap': svr_model, 'low_cap': svr_model}
+# Diccionarios para pasar a la clase (usamos el mismo modelo para todos)
+svr_models = {
+    'high_cap': svr_model,
+    'mid_cap': svr_model,
+    'low_cap': svr_model
+}
 
-# === Seleccionar activos ===
-selected_assets = price_cols
+xgboost_models = {
+    'high_cap': xgboost_model,
+    'mid_cap': xgboost_model,
+    'low_cap': xgboost_model
+}
 
-# === Clase personalizada ===
-class CustomBacktest(BacktestMultiStrategy):
-    def select_assets(self, date):
-        return selected_assets
-    def get_cap_type(self, date):
-        return 'high_cap'
+# === Instanciar backtest ===
+bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
 
 # === Ejecutar simulación ===
-bt = CustomBacktest(combined_data, svr_models, xgboost_model)
 bt.simulate()
 
 # === Mostrar resultados ===

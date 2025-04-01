@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 
 class BacktestMultiStrategy:
-    def __init__(self, data, svr_models, xgboost_model, initial_capital=1000000):
+    def __init__(self, data, svr_models, xgboost_models, initial_capital=1000000):
         """
         data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
               debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
@@ -14,7 +13,7 @@ class BacktestMultiStrategy:
         """
         self.data = data
         self.svr_models = svr_models
-        self.xgboost_model = xgboost_model
+        self.xgboost_models = xgboost_models
         self.initial_capital = initial_capital
 
         self.start_date = pd.to_datetime('2015-01-01')
@@ -30,13 +29,21 @@ class BacktestMultiStrategy:
         }
 
     def simulate(self):
-        rebalance_dates = pd.date_range(self.start_date, self.end_date, freq='12MS')
+        rebalance_dates = pd.date_range(self.start_date, self.end_date, freq='12MS') + pd.offsets.MonthBegin(1)
         strategies = list(self.results.keys())
         portfolio_values = {s: [self.initial_capital] for s in strategies}
+
+        print("Fechas de rebalanceo:")
+        print(rebalance_dates)
+
+        print("\nPrimeras fechas en el dataset:")
+        print(self.data['Price'].index[:10])
 
         for i in range(len(rebalance_dates) - 1):
             date = rebalance_dates[i]
             next_date = rebalance_dates[i + 1]
+
+            print(f"\nRebalanceo: {date.date()} ➡ {next_date.date()}")
 
             train_start = date - pd.DateOffset(years=1)
             train_end = date
@@ -45,11 +52,15 @@ class BacktestMultiStrategy:
             cap_type = self.get_cap_type(date)
 
             if not selected_assets:
+                print("No se seleccionaron activos.")
                 continue
+
+            print(f"Activos seleccionados: {selected_assets}")
+            print(f"Capitalización predominante: {cap_type}")
 
             weights_dict = {
                 'SVR-CPO': self.allocate_svr(selected_assets, date, cap_type),
-                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date),
+                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date, cap_type),
                 'EqualWeight': self.equal_weight(selected_assets),
                 'MinVar': self.min_var(selected_assets, date),
                 'MaxSharpe': self.max_sharpe(selected_assets, date)
@@ -58,9 +69,19 @@ class BacktestMultiStrategy:
             prices = self.data.loc[:, ('Price', selected_assets)]
             returns = prices.pct_change().loc[date:next_date].dropna()
 
+            print(f"Primeras filas de retornos entre {date.date()} y {next_date.date()}:")
+            print(returns.head())
+
             for strategy in strategies:
                 weights = weights_dict[strategy]
-                weight_vec = np.array([weights[a] for a in selected_assets])
+                weight_vec = np.array([weights.get(a, 0) for a in selected_assets])
+                print(f"→ {strategy} pesos: {weight_vec}, suma: {np.sum(weight_vec)}")
+
+                if len(returns) == 0:
+                    print(f"No hay retornos disponibles para {strategy} en este periodo.")
+                    portfolio_values[strategy].append(portfolio_values[strategy][-1])
+                    continue
+
                 strat_returns = returns.dot(weight_vec)
                 cumulative = np.prod(1 + strat_returns)
                 new_value = portfolio_values[strategy][-1] * cumulative
@@ -69,8 +90,13 @@ class BacktestMultiStrategy:
         for strategy in strategies:
             self.results[strategy] = portfolio_values[strategy]
 
+
     def select_assets(self, date):
-        return []
+        all_assets = self.data['Price'].columns.tolist()
+        asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
+        available_assets = [asset for asset in all_assets if not pd.isna(self.data.loc[asof_date, ('Price', asset)])]
+        return available_assets
+
 
     def get_cap_type(self, date):
         return 'high_cap'
@@ -92,8 +118,8 @@ class BacktestMultiStrategy:
 
         return dict(zip(assets, best_weights))
 
-    def allocate_xgboost(self, assets, date, n_samples=1000):
-        model = self.xgboost_model
+    def allocate_xgboost(self, assets, date, cap_type, n_samples=1000):
+        model = self.xgboost_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
 
