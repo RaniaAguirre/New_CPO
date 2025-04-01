@@ -6,7 +6,7 @@ from Backtesting import BacktestMultiStrategy
 data = pd.read_csv("Backtesting_data.csv", index_col=0, parse_dates=True)
 
 # === Definir columnas ===
-price_cols = data.columns[1:16].tolist()  # columnas 2 a 16 (15 activos)
+price_cols = data.columns[1:15].tolist()  # columnas 2 a 16 (15 activos)
 indicator_cols = [col for col in data.columns if col not in price_cols]
 
 # === Crear estructura MultiIndex ===
