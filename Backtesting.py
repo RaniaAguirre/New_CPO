@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
+
 
 class BacktestMultiStrategy:
     def __init__(self, data, svr_models, xgboost_models, initial_capital=1000000):
@@ -147,7 +149,7 @@ class BacktestMultiStrategy:
         prices = self.data.loc[:date, ('Price', assets)].dropna()
         returns = prices.pct_change().dropna()
         cov_matrix = returns.cov()
-        weights = self.min_variance_portfolio_analytical(cov_matrix)
+        weights = self.min_variance_portfolio_constrained(cov_matrix)
         return dict(zip(assets, weights))
 
     def max_sharpe(self, assets, date, risk_free_rate=0.01):
@@ -155,21 +157,36 @@ class BacktestMultiStrategy:
         returns = prices.pct_change().dropna()
         mean_returns = returns.mean() * 12
         cov_matrix = returns.cov() * 12
-        weights = self.max_sharpe_portfolio_analytical(mean_returns.values, cov_matrix.values, risk_free_rate)
+        weights = self.max_sharpe_portfolio_constrained(mean_returns.values, cov_matrix.values, risk_free_rate)
         return dict(zip(assets, weights))
 
-    def min_variance_portfolio_analytical(self, cov_matrix):
-        inv_cov = np.linalg.inv(cov_matrix)
-        ones = np.ones(len(cov_matrix))
-        return np.dot(inv_cov, ones) / np.dot(ones, np.dot(inv_cov, ones))
+    def min_variance_portfolio_constrained(self, cov_matrix):
+        n = len(cov_matrix)
+        x0 = np.ones(n) / n  # pesos iniciales iguales
 
-    def max_sharpe_portfolio_analytical(self, expected_returns, cov_matrix, risk_free_rate):
-        inv_cov = np.linalg.inv(cov_matrix)
-        ones = np.ones(len(cov_matrix))
-        excess_returns = expected_returns - risk_free_rate * ones
-        num = np.dot(inv_cov, excess_returns)
-        denom = np.dot(ones.T, num)
-        return num / denom
+        def portfolio_variance(w):
+            return np.dot(w.T, np.dot(cov_matrix.values, w))
+
+        constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
+        bounds = [(0, 1) for _ in range(n)]
+
+        result = minimize(portfolio_variance, x0, method='SLSQP', bounds=bounds, constraints=constraints)
+        return result.x
+
+    def max_sharpe_portfolio_constrained(self, expected_returns, cov_matrix, risk_free_rate):
+        n = len(expected_returns)
+        x0 = np.ones(n) / n
+
+        def neg_sharpe(w):
+            port_return = np.dot(w, expected_returns)
+            port_vol = np.sqrt(np.dot(w.T, np.dot(cov_matrix, w)))
+            return -((port_return - risk_free_rate) / port_vol)
+
+        constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
+        bounds = [(0, 1) for _ in range(n)]
+
+        result = minimize(neg_sharpe, x0, method='SLSQP', bounds=bounds, constraints=constraints)
+        return result.x
 
     def normalize_weights(self, weight_dict):
         total = sum(weight_dict.values())
