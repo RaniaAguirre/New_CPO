@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+import seaborn as sns
 
 
 class BacktestMultiStrategy:
@@ -193,8 +194,7 @@ class BacktestMultiStrategy:
         return {k: v / total for k, v in weight_dict.items()} if total != 0 else weight_dict
 
     def plot_results(self):
-        import seaborn as sns
-
+        
         # Línea de evolución total
         plt.figure(figsize=(10, 5))
         for strategy, values in self.results.items():
@@ -221,14 +221,15 @@ class BacktestMultiStrategy:
         plt.show()
 
         # Histograma de rendimientos
-        plt.figure(figsize=(10, 6))
-        for strategy in self.results:
-            sns.histplot(df_returns[strategy], kde=True, label=strategy, stat="density", bins=10, alpha=0.5)
-        plt.title('Histogramas de rendimientos anuales por estrategia')
-        plt.xlabel('Rendimiento anual')
-        plt.ylabel('Densidad')
-        plt.legend()
-        plt.grid(True)
+        strategies = list(self.results.keys())
+        fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 2.5 * len(strategies)))
+        for i, strategy in enumerate(strategies):
+            sns.histplot(df_returns[strategy], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+            axes[i].set_title(f'Histograma de rendimientos anuales: {strategy}')
+            axes[i].set_xlabel('Rendimiento anual')
+            axes[i].set_ylabel('Densidad')
+            axes[i].grid(True)
+        plt.tight_layout()
         plt.show()
 
     def evaluate(self):
