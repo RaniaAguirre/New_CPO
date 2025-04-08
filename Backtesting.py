@@ -192,54 +192,6 @@ class BacktestMultiStrategy:
         total = sum(weight_dict.values())
         return {k: v / total for k, v in weight_dict.items()} if total != 0 else weight_dict
 
-    def plot_results(self):
-        
-        # Línea de evolución total
-        plt.figure(figsize=(10, 5))
-        for strategy, values in self.results.items():
-            plt.plot(values, label=strategy)
-        plt.title('Evolución del valor del portafolio (2015-2025)')
-        plt.xlabel('Rebalanceos anuales')
-        plt.ylabel('Valor del portafolio')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
-        # Boxplot de rendimientos anuales
-        annual_returns = {}
-        for strategy, values in self.results.items():
-            returns = np.diff(values) / values[:-1]
-            annual_returns[strategy] = returns
-
-        df_returns = pd.DataFrame(annual_returns)
-        plt.figure(figsize=(8, 5))
-        sns.boxplot(data=df_returns)
-        plt.title('Distribución de rendimientos anuales por estrategia')
-        plt.ylabel('Rendimiento anual')
-        plt.grid(True)
-        plt.show()
-
-        # Histograma de rendimientos
-        strategies = list(self.results.keys())
-        fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 2.5 * len(strategies)))
-        for i, strategy in enumerate(strategies):
-            sns.histplot(df_returns[strategy], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
-            axes[i].set_title(f'Histograma de rendimientos anuales: {strategy}')
-            axes[i].set_xlabel('Rendimiento anual')
-            axes[i].set_ylabel('Densidad')
-            axes[i].grid(True)
-        plt.tight_layout()
-        plt.show()
-
-    def evaluate(self):
-        cagr_results = {}
-        n_years = (self.end_date - self.start_date).days / 365.25
-        for strategy, values in self.results.items():
-            initial_value = values[0]
-            final_value = values[-1]
-            cagr = (final_value / initial_value) ** (1 / n_years) - 1
-            cagr_results[strategy] = cagr
-        return pd.DataFrame(list(cagr_results.items()), columns=['Metodología', 'CAGR'])
     
 class AssetClassifier:
     def __init__(self, data: pd.DataFrame, indicators: list = None):
