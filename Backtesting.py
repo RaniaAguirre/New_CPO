@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 class BacktestMultiStrategy:
-    def __init__(self, data, svr_models, xgboost_models, initial_capital=1000000):
+    def __init__(self, data, svr_models, xgboost_models, initial_capital=1_000_000):
         """
         data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
               debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
@@ -22,6 +22,8 @@ class BacktestMultiStrategy:
         self.start_date = pd.to_datetime('2015-01-01')
         self.end_date = pd.to_datetime('2025-01-01')
         self.training_period = pd.to_datetime('2014-01-01')
+
+        self.classifier = AssetClassifier(data['Price'])
 
         self.results = {
             'SVR-CPO': [],
@@ -46,13 +48,13 @@ class BacktestMultiStrategy:
             date = rebalance_dates[i]
             next_date = rebalance_dates[i + 1]
 
-            print(f"\nRebalanceo: {date.date()} ➡ {next_date.date()}")
+            print(f"\nRebalanceo: {date.date()} -> {next_date.date()}")
 
             train_start = date - pd.DateOffset(years=1)
             train_end = date
 
             selected_assets = self.select_assets(date)
-            cap_type = self.get_cap_type(date)
+            cap_type = self.classifier.get_cap_type(selected_assets)
 
             if not selected_assets:
                 print("No se seleccionaron activos.")
@@ -78,7 +80,7 @@ class BacktestMultiStrategy:
             for strategy in strategies:
                 weights = weights_dict[strategy]
                 weight_vec = np.array([weights.get(a, 0) for a in selected_assets])
-                print(f"→ {strategy} pesos: {weight_vec}, suma: {np.sum(weight_vec)}")
+                print(f"{strategy} pesos: {weight_vec}, suma: {np.sum(weight_vec)}")
 
                 if len(returns) == 0:
                     print(f"No hay retornos disponibles para {strategy} en este periodo.")
@@ -101,10 +103,7 @@ class BacktestMultiStrategy:
         return available_assets
 
 
-    def get_cap_type(self, date):
-        return 'high_cap'
-
-    def allocate_svr(self, assets, date, cap_type, n_samples=1000):
+    def allocate_svr(self, assets, date, cap_type, n_samples=10_000):
         model = self.svr_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
@@ -121,7 +120,7 @@ class BacktestMultiStrategy:
 
         return dict(zip(assets, best_weights))
 
-    def allocate_xgboost(self, assets, date, cap_type, n_samples=1000):
+    def allocate_xgboost(self, assets, date, cap_type, n_samples=10_000):
         model = self.xgboost_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
@@ -153,7 +152,7 @@ class BacktestMultiStrategy:
         weights = self.min_variance_portfolio_constrained(cov_matrix)
         return dict(zip(assets, weights))
 
-    def max_sharpe(self, assets, date, risk_free_rate=0.01):
+    def max_sharpe(self, assets, date, risk_free_rate=0.05):
         prices = self.data.loc[:date, ('Price', assets)].dropna()
         returns = prices.pct_change().dropna()
         mean_returns = returns.mean() * 12
