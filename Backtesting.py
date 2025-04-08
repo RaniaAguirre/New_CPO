@@ -103,7 +103,7 @@ class BacktestMultiStrategy:
         return available_assets
 
 
-    def allocate_svr(self, assets, date, cap_type, n_samples=10_000):
+    def allocate_svr(self, assets, date, cap_type, n_samples=1_000):
         model = self.svr_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
@@ -120,7 +120,7 @@ class BacktestMultiStrategy:
 
         return dict(zip(assets, best_weights))
 
-    def allocate_xgboost(self, assets, date, cap_type, n_samples=10_000):
+    def allocate_xgboost(self, assets, date, cap_type, n_samples=1_000):
         model = self.xgboost_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
         candidate_weights = self.sample_weight_combinations(len(assets), n_samples)
