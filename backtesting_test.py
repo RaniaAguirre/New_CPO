@@ -35,9 +35,11 @@ xgboost_models = {
 classifier = AssetClassifier(data)
 
 # === Simulaciones ===
-n_simulations = 5
+n_simulations = 2
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
+risk_free_rate = 0.05
+monthly_rfr = risk_free_rate/12
 
 
 for sim in range(n_simulations):
@@ -47,17 +49,25 @@ for sim in range(n_simulations):
 
     for strategy, values in bt.results.items():
         returns = np.diff(values) / values[:-1]
-        downside_returns = returns[returns < 0]
+        portfolio_return = np.mean(returns)
+
+        excess_return = portfolio_return - risk_free_rate
+        downside_returns = returns[returns < monthly_rfr]
+        downside_deviation = downside_returns.std() if len(downside_returns) > 0 else np.nan
+        sortino = excess_return / downside_deviation if downside_deviation and downside_deviation != 0 else np.nan
 
         results.append({
             "Simulación": sim + 1,
             "Metodología": strategy,
-            "Rendimiento Anual Promedio": np.mean(returns) * 12,
-            "Desviación Estándar": np.std(returns) * np.sqrt(12),
+            "Rendimiento Anual Promedio": np.mean(returns),
+            "Desviación Estándar": np.std(returns),
             "Rendimiento Efectivo": np.prod(1 + returns) - 1,
-            "Downside Risk": (np.sqrt(np.mean(downside_returns ** 2)))*np.sqrt(12) if len(downside_returns) > 0 else 0,
-            "CAGR": (values[-1] / values[0]) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1
+            "Downside Risk": (np.sqrt(np.mean(downside_returns ** 2))) if len(downside_returns) > 0 else 0,
+            "CAGR": (values[-1] / values[0]) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1,
+            'Sortino ratio': sortino
         })
+
+        all_paths[strategy].append(values)
 
 # === Crear DataFrame con los resultados ===
 results_df = pd.DataFrame(results)
