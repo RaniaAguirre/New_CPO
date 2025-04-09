@@ -6,16 +6,11 @@ import seaborn as sns
 import numpy as np
 
 # === Cargar el dataset combinado ===
-data = pd.read_csv("Backtesting_data.csv", index_col=0, parse_dates=True)
+data = pd.read_csv("prices100_merged.csv", index_col=0, parse_dates=True)
 
-# === Definir columnas ===
-price_cols = data.columns[1:15].tolist()  # columnas 2 a 16 (15 activos)
-indicator_cols = [col for col in data.columns if col not in price_cols]
-
-# === Crear estructura MultiIndex ===
-price_multi = pd.concat([data[price_cols]], axis=1, keys=["Price"])
-ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
-combined_data = pd.concat([price_multi, ind_multi], axis=1)
+# === Identificar columnas ===
+indicator_cols = data.columns[-12:].tolist()
+price_cols = data.columns.difference(indicator_cols).tolist()
 
 # === Cargar modelo SVR ===
 svr_models = {
@@ -43,6 +38,12 @@ monthly_rfr = risk_free_rate/12
 
 
 for sim in range(n_simulations):
+    # Seleccionar 15 activos aleatorios
+    sampled_assets = np.random.choice(price_cols, size=15, replace=False).tolist()
+    price_multi = pd.concat([data[sampled_assets]], axis=1, keys=["Price"])
+    ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
+    combined_data = pd.concat([price_multi, ind_multi], axis=1)
+
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
     bt.classifier = classifier
     bt.simulate()
