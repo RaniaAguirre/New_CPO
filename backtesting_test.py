@@ -26,8 +26,6 @@ xgboost_models = {
     'low_cap': pickle.load(open("trained_models/Dataset_3_XGBoost_Sharpe.pkl", "rb"))
 }
 
-# === Instanciar clasificador ===
-classifier = AssetClassifier(data)
 
 # === Simulaciones ===
 n_simulations = 2
@@ -43,9 +41,10 @@ for sim in range(n_simulations):
     price_multi = pd.concat([data[sampled_assets]], axis=1, keys=["Price"])
     ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
     combined_data = pd.concat([price_multi, ind_multi], axis=1)
+    print(f'Columnas del dataset: {combined_data.columns}')
 
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
-    bt.classifier = classifier
+    bt.classifier = AssetClassifier(data)
     bt.simulate()
 
     for strategy, values in bt.results.items():
@@ -60,10 +59,10 @@ for sim in range(n_simulations):
         results.append({
             "Simulación": sim + 1,
             "Metodología": strategy,
-            "Rendimiento Anual Promedio": np.mean(returns),
+            "Rendimiento Anual Promedio": portfolio_return,
             "Desviación Estándar": np.std(returns),
             "Rendimiento Efectivo": np.prod(1 + returns) - 1,
-            "Downside Risk": (np.sqrt(np.mean(downside_returns ** 2))) if len(downside_returns) > 0 else 0,
+            "Downside Risk": downside_deviation,
             "CAGR": (values[-1] / values[0]) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1,
             'Sortino ratio': sortino
         })
