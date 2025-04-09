@@ -35,8 +35,10 @@ xgboost_models = {
 classifier = AssetClassifier(data)
 
 # === Simulaciones ===
-n_simulations = 10
+n_simulations = 5
 results = []
+all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
+
 
 for sim in range(n_simulations):
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
@@ -77,16 +79,31 @@ plt.title("Distribución del CAGR por Metodología")
 plt.grid(True)
 plt.show()
 
-# Histograma de rendimiento anual promedio
+# Histograma por metodología
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["Rendimiento Anual Promedio"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del Rendimiento Anual Promedio: {method}")
+    axes[i].set_xlabel("Rendimiento Anual Promedio")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
+plt.tight_layout()
+plt.show()
+
+# Evolución promedio de cada metodología
+mean_paths = {method: np.mean(np.array(all_paths[method]), axis=0) for method in all_paths}
+
 plt.figure(figsize=(10, 6))
-for method in results_df["Metodología"].unique():
-    sns.histplot(results_df[results_df["Metodología"] == method]["Rendimiento Anual Promedio"], kde=True, label=method, stat="density", bins=10, alpha=0.5)
-plt.title("Histogramas de Rendimiento Anual Promedio por Metodología")
-plt.xlabel("Rendimiento Anual Promedio")
-plt.ylabel("Densidad")
+for method, avg_path in mean_paths.items():
+    plt.plot(avg_path, label=method)
+plt.title("Evolución Promedio del Valor del Portafolio por Metodología")
+plt.xlabel("Rebalanceo Anual")
+plt.ylabel("Valor del Portafolio Promedio")
 plt.legend()
 plt.grid(True)
 plt.show()
+
 
 # Comparación de CAGR promedio
 summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel="CAGR Promedio", xlabel="Metodología")
