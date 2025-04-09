@@ -32,10 +32,40 @@ class Data:
         self.fecha_fin = fecha_fin
 
     def sp500(self, url="https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"):
-        """Carga los tickers del S&P500 desde Wikipedia y selecciona los primeros 100."""
+        """Carga los tickers del S&P500 desde Wikipedia y los ordena por capitalización de mercado."""
         try:
+            # Cargar la tabla desde Wikipedia
             table = pd.read_html(url)[0]
-            self.tickers = table['Symbol'].tolist()[:100]  # Solo los primeros 100 tickers
+            
+            # Filtrar solo la columna 'Symbol' para obtener los tickers
+            tickers = table['Symbol'].tolist()
+            #print(f"Tickers extraídos de Wikipedia (primeros 100): {tickers[:100]}")  # Verificar los primeros 10 tickers
+            
+            # Obtener la capitalización de mercado de cada ticker usando yfinance
+            market_caps = {}
+            for ticker in tickers:
+                try:
+                    # Descargar la información del ticker
+                    stock_info = yf.Ticker(ticker).info
+                    # Guardar el market cap si está disponible
+                    if 'marketCap' in stock_info:
+                        market_caps[ticker] = stock_info['marketCap']
+                        print(f"{ticker}: {market_caps[ticker]}")  # Verificar los marketCaps obtenidos
+                except Exception as e:
+                    print(f"Error al obtener market cap para {ticker}: {e}")
+            
+            # Ordenar los tickers por capitalización de mercado en orden descendente
+            sorted_tickers = sorted(market_caps.items(), key=lambda x: x[1], reverse=True)
+            print(f"Primeros 100 tickers ordenados por market cap: {sorted_tickers[:100]}")  # Verificar la ordenación
+            
+            # Guardar los primeros 100 tickers en la lista self.tickers
+            self.tickers = [ticker for ticker, _ in sorted_tickers[:100]]
+            
+            # Imprimir todos los 100 tickers seleccionados
+            #print(f"Primeros 100 tickers por market cap:")
+            #for i, ticker in enumerate(self.tickers, 1):
+            #    print(f"{i}. {ticker}")
+        
         except Exception as e:
             print(f"Error al obtener la lista de tickers: {e}")
 
