@@ -19,7 +19,6 @@ from sklearn.preprocessing import StandardScaler
 #from tensorflow.keras.models import Sequential
 #from tensorflow.keras.layers import Dense, Input
 #from tensorflow.keras.optimizers import Adam
-
 class Data:
     def __init__(self):
         self.tickers = []  # Lista de tickers inicialmente vacía
@@ -82,7 +81,7 @@ class Data:
                 data = yf.download(ticker, start=self.fecha_inicio, end=self.fecha_fin)
                 # Seleccionar solo la columna 'Close' y renombrarla para evitar conflictos
                 data = data[['Close']].rename(columns={'Close': ticker})
-                data = data.resample('ME').last()  # Resamplear a fin de mes
+                data = data.resample('MS').first()  # Resamplear a fin de mes
                 datos.append(data)
             except Exception as e:
                 print(f"Error al descargar datos para {ticker}: {e}")
@@ -229,7 +228,8 @@ class Sortino:
                 raise ValueError("El archivo CSV debe contener las columnas 'Date' y 'rfr'.")
             
             # Asegurar que esté resampleado a fin de mes
-            self.rfr_df = self.rfr_df.set_index("Date").resample("ME").first()
+            self.rfr_df = self.rfr_df.set_index("Date").resample("MS").first()  # Para inicio de mes
+
         except FileNotFoundError:
             raise FileNotFoundError(f"No se encontró el archivo CSV en la ruta: {rfr_csv_path}")
         except Exception as e:
