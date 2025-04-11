@@ -15,10 +15,10 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
-#import xgboost as xgb
-#from tensorflow.keras.models import Sequential
-#from tensorflow.keras.layers import Dense, Input
-#from tensorflow.keras.optimizers import Adam
+import xgboost as xgb
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.optimizers import Adam
 class Data:
     def __init__(self):
         self.tickers = []  # Lista de tickers inicialmente vacía
