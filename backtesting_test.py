@@ -6,7 +6,7 @@ import seaborn as sns
 import numpy as np
 
 # === Cargar el dataset combinado ===
-data = pd.read_csv("prices100_merged.csv", index_col=0, parse_dates=True)
+data = pd.read_csv("dbs/prices100_merged.csv", index_col=0, parse_dates=True)
 
 # === Identificar columnas ===
 indicator_cols = data.columns[-12:].tolist()
@@ -14,9 +14,9 @@ price_cols = data.columns.difference(indicator_cols).tolist()
 
 # === Cargar modelo SVR ===
 svr_models = {
-    'high_cap': pickle.load(open("trained_models/Dataset_1_SVR.pkl", "rb")),
-    'mid_cap': pickle.load(open("trained_models/Dataset_2_SVR.pkl", "rb")),
-    'low_cap': pickle.load(open("trained_models/Dataset_3_SVR.pkl", "rb"))
+    'high_cap': pickle.load(open("trained_models/Dataset_1_SVR_mc.pkl", "rb")),
+    'mid_cap': pickle.load(open("trained_models/Dataset_2_SVR_mc.pkl", "rb")),
+    'low_cap': pickle.load(open("trained_models/Dataset_3_SVR_mc.pkl", "rb"))
 }
 
 # === Cargar modelo XGBoost ===
