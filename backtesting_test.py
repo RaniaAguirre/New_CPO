@@ -1,9 +1,9 @@
 import pandas as pd
 import pickle
-from Backtesting import BacktestMultiStrategy, AssetClassifier
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
+from Backtesting import BacktestMultiStrategy, AssetClassifier
 
 # === Cargar el dataset combinado ===
 data = pd.read_csv("dbs/prices100_merged.csv", index_col=0, parse_dates=True)
@@ -26,22 +26,28 @@ xgboost_models = {
     'low_cap': pickle.load(open("trained_models/Dataset_3_XGBoost_Sharpe.pkl", "rb"))
 }
 
+def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
+    for _ in range(100):
+        sampled_assets = np.random.choice(price_cols, size=n_assets, replace=False).tolist()
+        if all(not data.loc[data.index.asof(date), sampled_assets].isnull().any() for date in rebalance_dates):
+            return sampled_assets
+    raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
 # === Simulaciones ===
-n_simulations = 2
+n_simulations = 1_000
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.05
 monthly_rfr = risk_free_rate/12
 
+rebalance_template = pd.date_range("2015-01-01", "2025-01-01", freq='12MS') + pd.offsets.MonthBegin(1)
 
 for sim in range(n_simulations):
-    # Seleccionar 15 activos aleatorios
-    sampled_assets = np.random.choice(price_cols, size=15, replace=False).tolist()
+    sampled_assets = select_valid_assets(data, price_cols, 15, rebalance_template)
+
     price_multi = pd.concat([data[sampled_assets]], axis=1, keys=["Price"])
     ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
     combined_data = pd.concat([price_multi, ind_multi], axis=1)
-    print(f'Columnas del dataset: {combined_data.columns}')
 
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
     bt.classifier = AssetClassifier(data)
@@ -78,18 +84,15 @@ print("\nResumen de métricas promedio por metodología:")
 print(summary)
 
 # === Gráficas ===
-# Gráfico de barras de rendimiento promedio
 summary["Rendimiento Anual Promedio"].plot(kind='bar', title='Rendimiento Anual Promedio por Metodología', ylabel='Promedio', xlabel='Metodología')
 plt.grid(True)
 plt.show()
 
-# Boxplot de CAGR
 sns.boxplot(data=results_df, x="Metodología", y="CAGR")
 plt.title("Distribución del CAGR por Metodología")
 plt.grid(True)
 plt.show()
 
-# Histograma por metodología
 strategies = results_df["Metodología"].unique()
 fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
 for i, method in enumerate(strategies):
@@ -101,9 +104,11 @@ for i, method in enumerate(strategies):
 plt.tight_layout()
 plt.show()
 
-# Evolución promedio de cada metodología
-mean_paths = {method: np.mean(np.array(all_paths[method]), axis=0) for method in all_paths}
+summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel="CAGR Promedio", xlabel="Metodología")
+plt.grid(True)
+plt.show()
 
+mean_paths = {method: np.mean(np.array(all_paths[method]), axis=0) for method in all_paths}
 plt.figure(figsize=(10, 6))
 for method, avg_path in mean_paths.items():
     plt.plot(avg_path, label=method)
@@ -111,11 +116,5 @@ plt.title("Evolución Promedio del Valor del Portafolio por Metodología")
 plt.xlabel("Rebalanceo Anual")
 plt.ylabel("Valor del Portafolio Promedio")
 plt.legend()
-plt.grid(True)
-plt.show()
-
-
-# Comparación de CAGR promedio
-summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel="CAGR Promedio", xlabel="Metodología")
 plt.grid(True)
 plt.show()
