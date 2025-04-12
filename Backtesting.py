@@ -74,8 +74,6 @@ class BacktestMultiStrategy:
             prices = self.data.loc[:, ('Price', selected_assets)]
             returns = prices.pct_change().loc[date:next_date].dropna()
 
-            print(f"Primeras filas de retornos entre {date.date()} y {next_date.date()}:")
-            print(returns.head())
 
             for strategy in strategies:
                 weights = weights_dict[strategy]
