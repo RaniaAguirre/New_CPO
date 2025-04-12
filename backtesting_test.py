@@ -4,6 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from Backtesting import BacktestMultiStrategy, AssetClassifier
+import os
+
+# Crear carpeta para guardar gráficas
+os.makedirs("plots", exist_ok=True)
 
 # === Cargar el dataset combinado ===
 data = pd.read_csv("dbs/prices100_merged.csv", index_col=0, parse_dates=True)
@@ -34,15 +38,15 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
 # === Simulaciones ===
-n_simulations = 1_000
+n_simulations = 5
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
-risk_free_rate = 0.05
-monthly_rfr = risk_free_rate/12
+risk_free_rate = 0.042
 
 rebalance_template = pd.date_range("2015-01-01", "2025-01-01", freq='12MS') + pd.offsets.MonthBegin(1)
 
 for sim in range(n_simulations):
+    print(f"Simulación {sim + 1}/{n_simulations}...")
     sampled_assets = select_valid_assets(data, price_cols, 15, rebalance_template)
 
     price_multi = pd.concat([data[sampled_assets]], axis=1, keys=["Price"])
@@ -58,7 +62,7 @@ for sim in range(n_simulations):
         portfolio_return = np.mean(returns)
 
         excess_return = portfolio_return - risk_free_rate
-        downside_returns = returns[returns < monthly_rfr]
+        downside_returns = returns[returns < risk_free_rate]
         downside_deviation = downside_returns.std() if len(downside_returns) > 0 else np.nan
         sortino = excess_return / downside_deviation if downside_deviation and downside_deviation != 0 else np.nan
 
@@ -86,12 +90,16 @@ print(summary)
 # === Gráficas ===
 summary["Rendimiento Anual Promedio"].plot(kind='bar', title='Rendimiento Anual Promedio por Metodología', ylabel='Promedio', xlabel='Metodología')
 plt.grid(True)
-plt.show()
+plt.tight_layout()
+plt.savefig("plots/rendimiento_anual_promedio.png")
+plt.close()
 
 sns.boxplot(data=results_df, x="Metodología", y="CAGR")
 plt.title("Distribución del CAGR por Metodología")
 plt.grid(True)
-plt.show()
+plt.tight_layout()
+plt.savefig("plots/boxplot_cagr.png")
+plt.close()
 
 strategies = results_df["Metodología"].unique()
 fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
@@ -102,11 +110,14 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.show()
+plt.savefig("plots/histogramas_rendimiento_anual.png")
+plt.close()
 
 summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel="CAGR Promedio", xlabel="Metodología")
 plt.grid(True)
-plt.show()
+plt.tight_layout()
+plt.savefig("plots/cagr_promedio.png")
+plt.close()
 
 mean_paths = {method: np.mean(np.array(all_paths[method]), axis=0) for method in all_paths}
 plt.figure(figsize=(10, 6))
@@ -117,4 +128,7 @@ plt.xlabel("Rebalanceo Anual")
 plt.ylabel("Valor del Portafolio Promedio")
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.tight_layout()
+plt.savefig("plots/evolucion_promedio_portafolio.png")
+plt.close()
+
