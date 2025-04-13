@@ -38,7 +38,7 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
 # === Simulaciones ===
-n_simulations = 1_000
+n_simulations = 5
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
@@ -132,3 +132,9 @@ plt.tight_layout()
 plt.savefig("plots/evolucion_promedio_portafolio.png")
 plt.close()
 
+# === Guardar resultados ===
+results_df.to_csv("plots/resultados_simulaciones.csv", index=False)
+summary.to_csv("plots/resumen_metricas.csv")
+
+with open("plots/results_list.pkl", "wb") as f:
+    pickle.dump(results, f)
