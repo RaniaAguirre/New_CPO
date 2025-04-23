@@ -38,7 +38,7 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
 # === Simulaciones ===
-n_simulations = 5
+n_simulations = 1_000
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
