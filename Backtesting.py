@@ -33,16 +33,13 @@ class BacktestMultiStrategy:
             'MaxSharpe': []
         }
 
-    def simulate(self):
+    def simulate(self, monthly=False):
         rebalance_dates = pd.date_range(self.start_date, self.end_date, freq='12MS') + pd.offsets.MonthBegin(1)
         strategies = list(self.results.keys())
         portfolio_values = {s: [self.initial_capital] for s in strategies}
 
         print("Fechas de rebalanceo:")
         print(rebalance_dates)
-
-        print("\nPrimeras fechas en el dataset:")
-        print(self.data['Price'].index[:10])
 
         for i in range(len(rebalance_dates) - 1):
             date = rebalance_dates[i]
@@ -74,7 +71,6 @@ class BacktestMultiStrategy:
             prices = self.data.loc[:, ('Price', selected_assets)]
             returns = prices.pct_change().loc[date:next_date].dropna()
 
-
             for strategy in strategies:
                 weights = weights_dict[strategy]
                 weight_vec = np.array([weights.get(a, 0) for a in selected_assets])
@@ -85,14 +81,29 @@ class BacktestMultiStrategy:
                     portfolio_values[strategy].append(portfolio_values[strategy][-1])
                     continue
 
-                strat_returns = returns.dot(weight_vec)
-                cumulative = np.prod(1 + strat_returns)
-                new_value = portfolio_values[strategy][-1] * cumulative
-                portfolio_values[strategy].append(new_value)
+                if monthly:
+                    for dt in returns.index:
+                        strat_return = returns.loc[dt].dot(weight_vec)
+                        new_value = portfolio_values[strategy][-1] * (1 + strat_return)
+                        portfolio_values[strategy].append(new_value)
+                else:
+                    strat_returns = returns.dot(weight_vec)
+                    cumulative = np.prod(1 + strat_returns)
+                    new_value = portfolio_values[strategy][-1] * cumulative
+                    portfolio_values[strategy].append(new_value)
 
         for strategy in strategies:
             self.results[strategy] = portfolio_values[strategy]
 
+
+    def evolution(self):
+
+        monthly_returns = {}
+        for strategy, values in self.results.items():
+            values = np.array(values)
+            returns = np.diff(values) / values[:-1]
+            monthly_returns[strategy] = pd.Series(returns)
+        return monthly_returns
 
     def select_assets(self, date):
         all_assets = self.data['Price'].columns.tolist()

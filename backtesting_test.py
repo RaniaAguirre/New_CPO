@@ -38,10 +38,11 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
 # === Simulaciones ===
-n_simulations = 1_000
+n_simulations = 5
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
+rfr_monthly = risk_free_rate/12
 
 rebalance_template = pd.date_range("2015-01-01", "2025-01-01", freq='12MS') + pd.offsets.MonthBegin(1)
 
@@ -55,29 +56,33 @@ for sim in range(n_simulations):
 
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
     bt.classifier = AssetClassifier(data)
-    bt.simulate()
+    bt.simulate(monthly = True)
 
-    for strategy, values in bt.results.items():
-        returns = np.diff(values) / values[:-1]
-        portfolio_return = np.mean(returns)
+    monthly_returns = bt.evolution()
 
-        excess_return = portfolio_return - risk_free_rate
-        downside_returns = returns[returns < risk_free_rate]
-        downside_deviation = downside_returns.std() if len(downside_returns) > 0 else np.nan
-        sortino = excess_return / downside_deviation if downside_deviation and downside_deviation != 0 else np.nan
+    for strategy, path in bt.results.items():
+        history = monthly_returns[strategy]
+        Pt, Po = path[-1], path[0]
 
+        rendimiento_anual = history.mean() * 12
+        std_anual = history.std() * np.sqrt(12)
+        excess_returns = history - rfr_monthly
+        downside_returns = excess_returns[excess_returns < rfr_monthly]
+        downside_deviation = downside_returns.std() * np.sqrt(12) if not downside_returns.empty else np.nan
+        sortino = (rendimiento_anual - risk_free_rate) / downside_deviation if downside_deviation and downside_deviation != 0 else np.na
+        
         results.append({
             "Simulación": sim + 1,
             "Metodología": strategy,
-            "Rendimiento Anual Promedio": portfolio_return,
-            "Desviación Estándar": np.std(returns),
-            "Rendimiento Efectivo": np.prod(1 + returns) - 1,
+            "Rendimiento Anual Promedio": rendimiento_anual,
+            "Desviación Estándar": std_anual,
+            "Rendimiento Efectivo": (Pt / Po) - 1,
             "Downside Risk": downside_deviation,
-            "CAGR": (values[-1] / values[0]) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1,
+            "CAGR": (Pt / Po) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1,
             'Sortino ratio': sortino
         })
 
-        all_paths[strategy].append(values)
+        all_paths[strategy].append(path)
 
 # === Crear DataFrame con los resultados ===
 results_df = pd.DataFrame(results)
@@ -117,19 +122,6 @@ summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel=
 plt.grid(True)
 plt.tight_layout()
 plt.savefig("plots/cagr_promedio.png")
-plt.close()
-
-mean_paths = {method: np.mean(np.array(all_paths[method]), axis=0) for method in all_paths}
-plt.figure(figsize=(10, 6))
-for method, avg_path in mean_paths.items():
-    plt.plot(avg_path, label=method)
-plt.title("Evolución Promedio del Valor del Portafolio por Metodología")
-plt.xlabel("Rebalanceo Anual")
-plt.ylabel("Valor del Portafolio Promedio")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.savefig("plots/evolucion_promedio_portafolio.png")
 plt.close()
 
 # === Guardar resultados ===
