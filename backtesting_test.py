@@ -37,6 +37,9 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
             return sampled_assets
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
+# === Inicializar clasificador ===
+classifier = AssetClassifier(data)
+
 # === Simulaciones ===
 n_simulations = 1_000
 results = []
@@ -54,8 +57,13 @@ for sim in range(n_simulations):
     ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
     combined_data = pd.concat([price_multi, ind_multi], axis=1)
 
+    # Clasificación de activos
+    cap_type = classifier.get_cap_type(sampled_assets)
+    print(f"Cap type seleccionado para esta simulación: {cap_type}")
+
+    # Correr backtesting
     bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
-    bt.classifier = AssetClassifier(data)
+    bt.classifier = classifier
     bt.simulate(monthly = True)
 
     monthly_returns = bt.evolution()
