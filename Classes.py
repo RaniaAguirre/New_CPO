@@ -169,14 +169,12 @@ class Data:
        count_1_30 = sum(1 for pos in positions if 1 <= pos <= 30)
        count_31_65 = sum(1 for pos in positions if 31 <= pos <= 65)
        count_66_100 = sum(1 for pos in positions if 66 <= pos <= 100)
-       if count_1_30 > len(selected_assets.columns) / 2:
-           return 1
-       elif count_31_65 > len(selected_assets.columns) / 2:
-           return 2
-       elif count_66_100 > len(selected_assets.columns) / 2:
-           return 3
-       else:
-           return None # No hay una mayoría clara en ninguna de las categorías
+       counts = {1: count_1_30, 2: count_31_65, 3: count_66_100}
+       max_group = max(counts, key=counts.get)
+       if counts[max_group] == 0:
+           return None
+   
+       return max_group, counts
 
 class Sortino:
     def __init__(self, returns_df, rfr_csv_path, selected_assets=None):
