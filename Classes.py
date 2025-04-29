@@ -151,50 +151,19 @@ class Data:
             print(f"Error al cargar el CSV: {e}")
             return pd.DataFrame()
 
-    def select_model(self, selected_tickers):
-        """
-        Determina qué modelo usar basado en la posición de los activos seleccionados.
-        Modelos:
-            - Modelo 1: mayoría en posiciones 1-30
-            - Modelo 2: mayoría en posiciones 31-65
-            - Modelo 3: mayoría en posiciones 66-100
-
-        Args:
-            selected_tickers (list): Lista de tickers seleccionados aleatoriamente.
-
-        Returns:
-            int: Número del modelo seleccionado (1, 2 o 3)
-        """
-        if not self.tickers or len(self.tickers) < 100:
-            raise ValueError("La lista de tickers debe contener al menos 100 elementos del S&P 500.")
-
-        # Crear un diccionario que asocie cada ticker con su posición
-        ticker_pos = {ticker: idx + 1 for idx, ticker in enumerate(self.tickers[:100])}
-
-        # Clasificar cada ticker seleccionado según su posición
-        count_model1 = sum(1 for t in selected_tickers if ticker_pos.get(t, 101) <= 30)
-        count_model2 = sum(1 for t in selected_tickers if 31 <= ticker_pos.get(t, 101) <= 65)
-        count_model3 = sum(1 for t in selected_tickers if 66 <= ticker_pos.get(t, 101) <= 100)
-
-        counts = {1: count_model1, 2: count_model2, 3: count_model3}
-        selected_model = max(counts, key=counts.get)
-
-        return selected_model
-
-
-
     def classify_assets(self, selected_assets):
        """Clasifica los activos seleccionados según su posición en el S&P500."""
        #if not self.sp500_tickers:
         #   print("Advertencia: La lista de tickers del S&P500 no se ha cargado.")
          #  return None
        positions = []
-       for asset in selected_assets.columns:
+       for asset_tuple in selected_assets.columns:
+           asset = asset_tuple[0]
            try:
-               position = self.sp500(asset) + 1
+               position = self.tickers.index(asset) + 1
                positions.append(position)
            except ValueError:
-               print(f"Advertencia: El activo {asset} no se encontró en la lista del S&P500.")
+               print(f"Advertencia: El activo {asset} no se encontró en la lista de los 100 principales del S&P500.")
        if not positions:
            return None
        count_1_30 = sum(1 for pos in positions if 1 <= pos <= 30)
