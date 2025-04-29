@@ -217,64 +217,11 @@ class AssetClassifier:
             'BCI', 'CCI', 'CLI', 'GPRI', 'Unemployment rate'
         ]
 
-        # Detectar tickers: columnas que no son indicadores
         self.tickers = [col for col in data.columns if col not in self.indicators]
-
-        # Obtener y clasificar por capitalización real
-        raw_caps = self.get_real_market_caps(self.tickers)
-        self.capitalizations = {
-            ticker: self.classify_market_cap(raw_caps[ticker]) for ticker in self.tickers
-        }
-
-    def get_real_market_caps(self, tickers):
-        """
-        Obtiene la capitalización bursátil de una lista de tickers usando yfinance.
-
-        Args:
-            tickers (list): Lista de tickers (str)
-
-        Returns:
-            dict: Diccionario ticker -> market cap
-        """
-        market_caps = {}
-        for ticker in tickers:
-            try:
-                data = yf.Ticker(ticker)
-                cap = data.info.get('marketCap', None)
-                market_caps[ticker] = cap
-            except:
-                market_caps[ticker] = None
-        return market_caps
-
-    def classify_market_cap(self, cap):
-        """
-        Clasifica un valor de market cap como small, mid o high.
-
-        Args:
-            cap (float): Valor de market cap en dólares.
-
-        Returns:
-            str: 'small_cap', 'mid_cap', o 'high_cap'
-        """
-        if cap is None:
-            return 'mid_cap'  # Por defecto
-        elif cap >= 10e9:
-            return 'high_cap'
-        elif cap >= 2e9:
-            return 'mid_cap'
-        else:
-            return 'small_cap'
 
     def select_assets(self, date: pd.Timestamp, n_assets: int = 5):
         """
         Selecciona hasta n_assets activos con datos disponibles en la fecha dada.
-
-        Args:
-            date (pd.Timestamp): Fecha objetivo.
-            n_assets (int): Número de activos a seleccionar.
-
-        Returns:
-            list: Lista de tickers seleccionados
         """
         asset_columns = self.tickers
         asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
@@ -283,14 +230,28 @@ class AssetClassifier:
 
     def get_cap_type(self, selected_assets: list):
         """
-        Determina la capitalización predominante de una lista de activos.
+        Clasifica el portafolio según la posición de los activos en el ranking de las primeras 100 acciones del S&P500.
 
-        Args:
-            selected_assets (list): Lista de tickers
-
-        Returns:
-            str: Tipo de capitalización dominante
+        Usa mayoría absoluta (más de 2/3). Si no hay mayoría, se asigna modelo 2 (mid_cap).
         """
-        caps = [self.capitalizations.get(asset, 'mid_cap') for asset in selected_assets]
-        return max(set(caps), key=caps.count)
+        if not self.tickers or len(self.tickers) < 100:
+            raise ValueError("Se requiere al menos un top 100 ordenado de tickers para clasificar.")
 
+        # Asociar cada ticker con su posición en el top 100
+        ticker_pos = {ticker: idx + 1 for idx, ticker in enumerate(self.tickers[:100])}
+
+        count_1_30 = sum(1 for t in selected_assets if ticker_pos.get(t, 101) <= 30)
+        count_31_65 = sum(1 for t in selected_assets if 31 <= ticker_pos.get(t, 101) <= 65)
+        count_66_100 = sum(1 for t in selected_assets if 66 <= ticker_pos.get(t, 101) <= 100)
+
+        total = len(selected_assets)
+        threshold = (2 * total) / 3  # mayoría absoluta
+
+        if count_1_30 > threshold:
+            return 'high_cap'  # modelo 1
+        elif count_31_65 > threshold:
+            return 'mid_cap'   # modelo 2
+        elif count_66_100 > threshold:
+            return 'low_cap'   # modelo 3
+        else:
+            return 'mid_cap'   # sin mayoría absoluta
