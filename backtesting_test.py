@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from Backtesting import BacktestMultiStrategy, AssetClassifier
 import os
+import yfinance as yf
+import pandas as pd
+
 
 # Crear carpeta para guardar gráficas
 os.makedirs("plots", exist_ok=True)
@@ -37,11 +40,40 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
             return sampled_assets
     raise ValueError("No se encontraron suficientes activos válidos para todas las fechas.")
 
+def asset_ranking(price_cols):
+    """
+    Obtiene un ranking de capitalización de mercado para los tickers dados.
+
+    Args:
+        price_cols (list): Lista de tickers.
+
+    Returns:
+        dict: Diccionario ticker -> ranking (1 = mayor market cap).
+    """
+    market_caps = {}
+    for ticker in price_cols:
+        try:
+            info = yf.Ticker(ticker).info
+            cap = info.get('marketCap')
+            if cap:
+                market_caps[ticker] = cap
+        except:
+            market_caps[ticker] = None
+
+    ranking_df = pd.DataFrame.from_dict(market_caps, orient='index', columns=['MarketCap'])
+    ranking_df = ranking_df.dropna().sort_values(by='MarketCap', ascending=False).reset_index()
+    ranking_df.columns = ['Ticker', 'MarketCap']
+    ranking_df['Rank'] = ranking_df.index + 1
+
+    ranking_dict = dict(zip(ranking_df['Ticker'], ranking_df['Rank']))
+    return ranking_dict
+
 # === Inicializar clasificador ===
-classifier = AssetClassifier(data)
+ranking_dict = asset_ranking(price_cols)
+classifier = AssetClassifier(data, ranking_dict = ranking_dict)
 
 # === Simulaciones ===
-n_simulations = 1000
+n_simulations = 20
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
@@ -62,7 +94,7 @@ for sim in range(n_simulations):
     print(f"Cap type seleccionado para esta simulación: {cap_type}")
 
     # Correr backtesting
-    bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
+    bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models, ranking_dict)
     bt.classifier = classifier
     bt.simulate(monthly = True)
 
