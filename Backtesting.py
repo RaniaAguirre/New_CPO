@@ -237,21 +237,25 @@ class AssetClassifier:
         if not self.tickers or len(self.tickers) < 100:
             raise ValueError("Se requiere al menos un top 100 ordenado de tickers para clasificar.")
 
-        # Asociar cada ticker con su posición en el top 100
-        ticker_pos = {ticker: idx + 1 for idx, ticker in enumerate(self.tickers[:100])}
+        ticker_positions = {ticker: idx + 1 for idx, ticker in enumerate(self.tickers[:100])}
 
-        count_1_30 = sum(1 for t in selected_assets if ticker_pos.get(t, 101) <= 30)
-        count_31_65 = sum(1 for t in selected_assets if 31 <= ticker_pos.get(t, 101) <= 65)
-        count_66_100 = sum(1 for t in selected_assets if 66 <= ticker_pos.get(t, 101) <= 100)
+        # Calcular la cantidad de activos en cada rango
+        count_model1 = sum(1 for asset in selected_assets if ticker_positions.get(asset, 101) <= 30)
+        count_model2 = sum(1 for asset in selected_assets if 31 <= ticker_positions.get(asset, 101) <= 65)
+        count_model3 = sum(1 for asset in selected_assets if 66 <= ticker_positions.get(asset, 101) <= 100)
 
-        total = len(selected_assets)
-        threshold = (2 * total) / 3  # mayoría absoluta
+        counts = {1: count_model1, 2: count_model2, 3: count_model3}
+        selected_model = max(counts, key=counts.get)
 
-        if count_1_30 > threshold:
-            return 'high_cap'  # modelo 1
-        elif count_31_65 > threshold:
-            return 'mid_cap'   # modelo 2
-        elif count_66_100 > threshold:
-            return 'low_cap'   # modelo 3
+        # Validar si hay empate
+        values = list(counts.values())
+        if values.count(max(values)) > 1:
+            return 'mid_cap'  
+        
+        # Asignar cap type según el modelo
+        if selected_model == 1:
+            return 'high_cap'
+        elif selected_model == 2:
+            return 'mid_cap'
         else:
-            return 'mid_cap'   # sin mayoría absoluta
+            return 'low_cap'
