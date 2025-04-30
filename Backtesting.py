@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 class BacktestMultiStrategy:
-    def __init__(self, data, svr_models, xgboost_models, initial_capital=1_000_000, cap_type = 'mid_cap'):
+    def __init__(self, data, svr_models, xgboost_models, ranking_dict, initial_capital=1_000_000, cap_type = 'mid_cap'):
         """
         data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
               debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
@@ -24,7 +24,7 @@ class BacktestMultiStrategy:
         self.end_date = pd.to_datetime('2025-01-01')
         self.training_period = pd.to_datetime('2014-01-01')
 
-        self.classifier = AssetClassifier(data['Price'])
+        self.classifier = AssetClassifier(data['Price'], ranking_dict)
 
         self.results = {
             'SVR-CPO': [],
@@ -204,59 +204,50 @@ class BacktestMultiStrategy:
 
     
 class AssetClassifier:
-    def __init__(self, data: pd.DataFrame, indicators: list = None):
+    def __init__(self, data: pd.DataFrame, ranking_dict: dict, indicators: list = None):
         """
-        Inicializa la clase de clasificación de activos a partir de precios e indicadores.
+        Inicializa la clase de clasificación de activos.
 
         Args:
             data (pd.DataFrame): DataFrame con columnas de tickers e indicadores.
+            ranking_dict (dict): Diccionario con los tickers como llave y su ranking (1 a 100) como valor.
             indicators (list, optional): Lista de nombres de columnas que son indicadores de mercado.
         """
         self.data = data
+        self.ranking = ranking_dict
         self.indicators = indicators or [
             'MOM', 'Treasury Bond 3M', 'WTI index', 'Dollar index', 'TRCCRB',
             'BCI', 'CCI', 'CLI', 'GPRI', 'Unemployment rate'
         ]
-
         self.tickers = [col for col in data.columns if col not in self.indicators]
 
-    def select_assets(self, date: pd.Timestamp, n_assets: int = 5):
+    def get_cap_type(self, selected_assets: list) -> str:
         """
-        Selecciona hasta n_assets activos con datos disponibles en la fecha dada.
+        Clasifica una lista de activos según su ranking.
+
+        Modelos:
+            - Modelo 1 (high cap): mayoría en posiciones 1-30
+            - Modelo 2 (mid cap): mayoría en posiciones 31-65
+            - Modelo 3 (low cap): mayoría en posiciones 66-100
+            En caso de empate o falta de mayoría, devuelve 'mid_cap'.
+
+        Args:
+            selected_assets (list): Lista de tickers seleccionados.
+
+        Returns:
+            str: Tipo de capitalización dominante ('high_cap', 'mid_cap' o 'low_cap')
         """
-        asset_columns = self.tickers
-        asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
-        available_assets = [asset for asset in asset_columns if not pd.isna(self.data.loc[asof_date, asset])]
-        return sorted(available_assets)[:n_assets]
+        count_model1 = sum(1 for t in selected_assets if self.ranking.get(t, 101) <= 30)
+        count_model2 = sum(1 for t in selected_assets if 31 <= self.ranking.get(t, 101) <= 65)
+        count_model3 = sum(1 for t in selected_assets if 66 <= self.ranking.get(t, 101) <= 100)
 
-    def get_cap_type(self, selected_assets: list):
-        """
-        Clasifica el portafolio según la posición de los activos en el ranking de las primeras 100 acciones del S&P500.
-
-        Usa mayoría absoluta (más de 2/3). Si no hay mayoría, se asigna modelo 2 (mid_cap).
-        """
-        if not self.tickers or len(self.tickers) < 100:
-            raise ValueError("Se requiere al menos un top 100 ordenado de tickers para clasificar.")
-
-        ticker_positions = {ticker: idx + 1 for idx, ticker in enumerate(self.tickers[:100])}
-
-        # Calcular la cantidad de activos en cada rango
-        count_model1 = sum(1 for asset in selected_assets if ticker_positions.get(asset, 101) <= 30)
-        count_model2 = sum(1 for asset in selected_assets if 31 <= ticker_positions.get(asset, 101) <= 65)
-        count_model3 = sum(1 for asset in selected_assets if 66 <= ticker_positions.get(asset, 101) <= 100)
-
-        counts = {1: count_model1, 2: count_model2, 3: count_model3}
-        selected_model = max(counts, key=counts.get)
-
-        # Validar si hay empate
-        values = list(counts.values())
-        if values.count(max(values)) > 1:
-            return 'mid_cap'  
-        
-        # Asignar cap type según el modelo
-        if selected_model == 1:
+        total = len(selected_assets)
+        if count_model1 > total / 2:
             return 'high_cap'
-        elif selected_model == 2:
+        elif count_model2 > total / 2:
             return 'mid_cap'
-        else:
+        elif count_model3 > total / 2:
             return 'low_cap'
+        else:
+            return 'mid_cap'
+
