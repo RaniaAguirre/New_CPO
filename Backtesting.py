@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 class BacktestMultiStrategy:
-    def __init__(self, data, svr_models, xgboost_models, initial_capital=1_000_000):
+    def __init__(self, data, svr_models, xgboost_models, initial_capital=1_000_000, cap_type = 'mid_cap'):
         """
         data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
               debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
@@ -18,6 +18,7 @@ class BacktestMultiStrategy:
         self.svr_models = svr_models
         self.xgboost_models = xgboost_models
         self.initial_capital = initial_capital
+        self.cap_type = cap_type
 
         self.start_date = pd.to_datetime('2015-01-01')
         self.end_date = pd.to_datetime('2025-01-01')
@@ -51,18 +52,18 @@ class BacktestMultiStrategy:
             train_end = date
 
             selected_assets = self.select_assets(date)
-            cap_type = self.classifier.get_cap_type(selected_assets)
+            #cap_type = self.classifier.get_cap_type(selected_assets)
 
             if not selected_assets:
                 print("No se seleccionaron activos.")
                 continue
 
             print(f"Activos seleccionados: {selected_assets}")
-            print(f"Capitalización predominante: {cap_type}")
+            #print(f"Capitalización predominante: {cap_type}")
 
             weights_dict = {
-                'SVR-CPO': self.allocate_svr(selected_assets, date, cap_type),
-                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date, cap_type),
+                'SVR-CPO': self.allocate_svr(selected_assets, date, self.cap_type),
+                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date, self.cap_type),
                 'EqualWeight': self.equal_weight(selected_assets),
                 'MinVar': self.min_var(selected_assets, date),
                 'MaxSharpe': self.max_sharpe(selected_assets, date)
