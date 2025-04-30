@@ -41,7 +41,7 @@ def select_valid_assets(data, price_cols, n_assets, rebalance_dates):
 classifier = AssetClassifier(data)
 
 # === Simulaciones ===
-n_simulations = 2
+n_simulations = 1000
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
