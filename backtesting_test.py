@@ -73,7 +73,7 @@ ranking_dict = asset_ranking(price_cols)
 classifier = AssetClassifier(data, ranking_dict = ranking_dict)
 
 # === Simulaciones ===
-n_simulations = 20
+n_simulations = 1000
 results = []
 all_paths = {method: [] for method in ['SVR-CPO', 'XGBoost-CPO', 'EqualWeight', 'MinVar', 'MaxSharpe']}
 risk_free_rate = 0.042
