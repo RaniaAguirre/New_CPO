@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
 import warnings
-import quantstats as qs
+#import quantstats as qs
 
 #ML libraries
 from abc import ABC, abstractmethod
@@ -186,22 +186,22 @@ class Sortino:
             rfr_csv_path (str): Ruta al archivo CSV que contiene las tasas libres de riesgo mensuales.
             selected_assets (list, optional): Lista de tickers a utilizar. Si es None, se extraen de returns_df.
         """
-        self.returns_df = returns_df
+        self.returns_df = returns_df.copy()
+        self.returns_df['Date'] = pd.to_datetime(self.returns_df['Date'])
+        self.returns_df.set_index('Date', inplace=True)
+        self.returns_df.index = self.returns_df.index.normalize()
+        self.returns_df = self.returns_df[self.returns_df.index < "2025-01-01"]
+
+        self.rfr_df = pd.read_csv(rfr_csv_path)
+        self.rfr_df.columns = [col.strip().lower() for col in self.rfr_df.columns]
+
+        if "date" not in self.rfr_df.columns or "rfr" not in self.rfr_df.columns:
+            raise ValueError("El archivo CSV debe contener las columnas 'Date' y 'rfr'.")
         
-        # Leer el archivo CSV con las tasas libres de riesgo
-        try:
-            self.rfr_df = pd.read_csv(rfr_csv_path, parse_dates=["Date"])
-            if "Date" not in self.rfr_df.columns or "rfr" not in self.rfr_df.columns:
-                raise ValueError("El archivo CSV debe contener las columnas 'Date' y 'rfr'.")
-            
-            # Asegurar que esté resampleado a fin de mes
-            self.rfr_df = self.rfr_df.set_index("Date")
-
-
-        except FileNotFoundError:
-            raise FileNotFoundError(f"No se encontró el archivo CSV en la ruta: {rfr_csv_path}")
-        except Exception as e:
-            raise ValueError(f"Error al leer el archivo CSV: {e}")
+        self.rfr_df.rename(columns={"date": "Date"}, inplace=True)
+        self.rfr_df["Date"] = pd.to_datetime(self.rfr_df["Date"])
+        self.rfr_df.set_index("Date", inplace=True)
+        self.rfr_df.index = self.rfr_df.index.normalize()
         
         # Si no se pasan activos seleccionados, se asume que son las columnas del DataFrame de rendimientos.
         if selected_assets is None:
@@ -220,6 +220,7 @@ class Sortino:
         """
         weights_list = []
         for date in self.returns_df.index:
+            date = pd.to_datetime(date).normalize()
             for _ in range(num_combinations):
                 raw_weights = np.random.rand(len(self.selected_assets))
                 normalized_weights = (raw_weights / raw_weights.sum()) * 100
@@ -254,7 +255,7 @@ class Sortino:
         
         sortino_ratios = []
         for _, row in self.weights_df.iterrows():
-            date = row["Date"]
+            date = pd.to_datetime(row["Date"]).normalize()
             portfolio_return = row["Portfolio_Returns"]
             
             # Obtener la tasa libre de riesgo correspondiente a la fecha
