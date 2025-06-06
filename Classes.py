@@ -195,7 +195,8 @@ class Sortino:
                 raise ValueError("El archivo CSV debe contener las columnas 'Date' y 'rfr'.")
             
             # Asegurar que esté resampleado a fin de mes
-            self.rfr_df = self.rfr_df.set_index("Date").resample("MS").first()  # Para inicio de mes
+            self.rfr_df = self.rfr_df.set_index("Date").asfreq("D")
+
 
         except FileNotFoundError:
             raise FileNotFoundError(f"No se encontró el archivo CSV en la ruta: {rfr_csv_path}")
