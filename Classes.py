@@ -704,23 +704,44 @@ class Market_Features:
     
 
 
+
 class PortfolioClassifier:
     def __init__(self, market_caps_file, sheet_name="market_caps_limpios"):
         self.df = pd.read_excel(market_caps_file, sheet_name=sheet_name)
         self.market_caps = self.df.set_index("Dbs_daily")["Market Cap"].to_dict()
         self.reference_portfolios = []
+        self.reference_weights = []
 
-    def add_reference_portfolio(self, tickers):
+    def add_reference_portfolio(self, tickers, weights=None):
         self.reference_portfolios.append(tickers)
+        if weights is None:
+            weights = self.generate_random_weights(len(tickers))
+        self.reference_weights.append(weights)
 
-    def classify(self, tickers_portafolio):
-        mc_temp = sum([self.market_caps[t] for t in tickers_portafolio if t in self.market_caps])
+    def classify(self, tickers_portafolio, weights_portafolio=None):
+        if weights_portafolio is None:
+            weights_portafolio = self.generate_random_weights(len(tickers_portafolio))
+
+        mc_temp = sum([
+            self.market_caps.get(t, 0) * w
+            for t, w in zip(tickers_portafolio, weights_portafolio)
+        ])
+
         mc_totales = []
-        for port in self.reference_portfolios:
-            cap = sum([self.market_caps[t] for t in port if t in self.market_caps])
+        for tickers, weights in zip(self.reference_portfolios, self.reference_weights):
+            cap = sum([
+                self.market_caps.get(t, 0) * w
+                for t, w in zip(tickers, weights)
+            ])
             mc_totales.append(cap)
+
         mc_totales.append(mc_temp)
+
         X = np.array(mc_totales).reshape(-1, 1)
+
+        if np.isnan(X).any() or np.isinf(X).any():
+            raise ValueError(f"El array de market caps contiene NaN o inf:\n{X}")
+
         kmeans = KMeans(n_clusters=3, random_state=42).fit(X)
         etiquetas = kmeans.labels_
         centroides = kmeans.cluster_centers_.flatten()
@@ -729,13 +750,12 @@ class PortfolioClassifier:
         return cluster_map[etiquetas[-1]]
 
     def get_random_portfolio(self, n=20, exclude=None):
-        """
-        Devuelve una lista aleatoria de n tickers disponibles en el DataFrame.
-        Puede excluir ciertos tickers si se pasa una lista en 'exclude'.
-        """
         available = list(self.market_caps.keys())
         if exclude:
             available = list(set(available) - set(exclude))
         return random.sample(available, n)
 
-    
+    def generate_random_weights(self, n):
+        raw_weights = np.random.rand(n)
+        normalized_weights = raw_weights / raw_weights.sum()
+        return normalized_weights.tolist()
