@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
 import warnings
 import random
+import requests
 
 #import quantstats as qs
 
@@ -17,6 +18,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 import xgboost as xgb
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input
