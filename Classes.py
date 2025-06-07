@@ -7,6 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
 import warnings
+import random
+
 #import quantstats as qs
 
 #ML libraries
@@ -697,4 +699,41 @@ class Market_Features:
         """
         combined_df = pd.merge(df1, df2, how='outer', on='Date')
         return combined_df
+    
+
+
+class PortfolioClassifier:
+    def __init__(self, market_caps_file, sheet_name="market_caps_limpios"):
+        self.df = pd.read_excel(market_caps_file, sheet_name=sheet_name)
+        self.market_caps = self.df.set_index("Dbs_daily")["Market Cap"].to_dict()
+        self.reference_portfolios = []
+
+    def add_reference_portfolio(self, tickers):
+        self.reference_portfolios.append(tickers)
+
+    def classify(self, tickers_portafolio):
+        mc_temp = sum([self.market_caps[t] for t in tickers_portafolio if t in self.market_caps])
+        mc_totales = []
+        for port in self.reference_portfolios:
+            cap = sum([self.market_caps[t] for t in port if t in self.market_caps])
+            mc_totales.append(cap)
+        mc_totales.append(mc_temp)
+        X = np.array(mc_totales).reshape(-1, 1)
+        kmeans = KMeans(n_clusters=3, random_state=42).fit(X)
+        etiquetas = kmeans.labels_
+        centroides = kmeans.cluster_centers_.flatten()
+        orden = np.argsort(centroides)
+        cluster_map = {orden[0]: -1, orden[1]: 0, orden[2]: 1}
+        return cluster_map[etiquetas[-1]]
+
+    def get_random_portfolio(self, n=20, exclude=None):
+        """
+        Devuelve una lista aleatoria de n tickers disponibles en el DataFrame.
+        Puede excluir ciertos tickers si se pasa una lista en 'exclude'.
+        """
+        available = list(self.market_caps.keys())
+        if exclude:
+            available = list(set(available) - set(exclude))
+        return random.sample(available, n)
+
     
