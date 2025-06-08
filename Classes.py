@@ -742,7 +742,7 @@ class PortfolioClassifier:
         if np.isnan(X).any() or np.isinf(X).any():
             raise ValueError(f"El array de market caps contiene NaN o inf:\n{X}")
 
-        kmeans = KMeans(n_clusters=3, random_state=42).fit(X)
+        kmeans = KMeans(n_clusters=3).fit(X)
         etiquetas = kmeans.labels_
         centroides = kmeans.cluster_centers_.flatten()
         orden = np.argsort(centroides)
