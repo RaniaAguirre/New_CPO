@@ -2,3 +2,4 @@ daily_dbs/sortino_daily_HighCap.csv filter=lfs diff=lfs merge=lfs -text
 daily_dbs/sortino_daily_LowCap.csv filter=lfs diff=lfs merge=lfs -text
 daily_dbs/sortino_daily_LowCap.csv filter=lfs diff=lfs merge=lfs -text
 daily_dbs/sortino_daily_LowCap.csv filter=lfs diff=lfs merge=lfs -text
+daily_dbs/sortino_daily_MidCap.csv filter=lfs diff=lfs merge=lfs -text
