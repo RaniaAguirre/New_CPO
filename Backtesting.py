@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import seaborn as sns
 import random
+from Classes import PortfolioClassifier
+
 
 
 class BacktestMultiStrategy:
