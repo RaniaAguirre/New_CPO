@@ -258,6 +258,7 @@ class Sortino:
             raise ValueError("Debes calcular los rendimientos del portafolio antes de calcular el Ratio de Sortino.")
         
         sortino_ratios = []
+        grouped = self.weights_df.groupby("Date")
         for _, row in self.weights_df.iterrows():
             date = pd.to_datetime(row["Date"]).normalize()
             portfolio_return = row["Portfolio_Returns"]
@@ -281,6 +282,32 @@ class Sortino:
         self.weights_df["Sortino_Ratio"] = sortino_ratios
         print("Ratios de Sortino calculados para cada combinación de pesos.")
 
+    def calculate_sharpe_ratio(self):
+        if "Portfolio_Returns" not in self.weights_df.columns:
+            raise ValueError("Debes calcular los rendimientos del portafolio antes de calcular el Ratio de Sortino.")
+        
+        sharpe_ratios = []
+        for _, row in self.weights_df.iterrows():
+            date = pd.to_datetime(row["Date"]).normalize()
+            portfolio_return = row["Portfolio_Returns"]
+            
+            # Obtener la tasa libre de riesgo correspondiente a la fecha
+            try:
+                risk_free_rate = self.rfr_df.loc[date, "rfr"] / 100  # Convertir a decimal
+            except KeyError:
+                print(f"No se encontró la tasa libre de riesgo para la fecha {date}. Usando NaN.")
+                risk_free_rate = np.nan
+            
+            excess_return = portfolio_return - (risk_free_rate / 252)  # Ajuste diario
+            
+            std_dev = self.weights_df[self.weights_df["Date"] == date]["Portfolio_Returns"].std()
+            
+            sharpe_ratio = excess_return / std_dev if std_dev != 0 else np.nan
+            sharpe_ratios.append(sharpe_ratio)
+
+        self.weights_df["Sharpe_Ratio"] = sharpe_ratios
+        print("Ratios de Sharpe calculados para cada combinación de pesos.")
+
     def create_portfolio_dataset(self):
         """
         Devuelve el DataFrame completo con las combinaciones de pesos, rendimientos del portafolio
@@ -289,7 +316,7 @@ class Sortino:
         Returns:
             pd.DataFrame: DataFrame con la información del portafolio.
         """
-        if "Sortino_Ratio" not in self.weights_df.columns:
+        if "Sharpe_Ratio" not in self.weights_df.columns:
             raise ValueError("Debes calcular los rendimientos y el Ratio de Sortino antes de crear el dataset.")
         
         return self.weights_df
@@ -308,7 +335,7 @@ class SharpeCalculatorUnified:
                                         - 'Portfolio_Returns'
                                         - 'rfr' (tasa libre de riesgo en porcentaje)
         """
-        self.dataset = pd.read_csv(dataset_csv_path, parse_dates=["Date"])
+        self.dataset = dataset_csv_path
         # Verificar que el dataset tenga las columnas requeridas
         required_columns = {"Date", "Portfolio_Returns", "rfr"}
         if not required_columns.issubset(self.dataset.columns):
