@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from Backtesting import BacktestMultiStrategy
 import os
+from Classes import PortfolioClassifier
+
 
 
 # Crear carpeta para guardar gráficas
@@ -51,7 +53,12 @@ for sim in range(n_simulations):
 
     # Correr backtesting
     bt = BacktestMultiStrategy(combined_data, svr_models)
-    #bt.classifier = classifier
+    
+    bt.portfolio_classifier = PortfolioClassifier("daily_dbs/market_caps.xlsx")
+    for _ in range(5):
+        random_tickers = bt.portfolio_classifier.get_random_portfolio(n = 20)
+        bt.portfolio_classifier.add_reference_portfolio(random_tickers)     
+    
     bt.simulate(cap_type)
 
     daily_returns = bt.evolution()
