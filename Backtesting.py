@@ -8,6 +8,7 @@ from Classes import PortfolioClassifier
 
 
 
+
 class BacktestMultiStrategy:
     def __init__(self, data, svr_models, initial_capital=1_000_000):
         """
@@ -58,6 +59,13 @@ class BacktestMultiStrategy:
             print(f"\nRebalanceo: {date.date()} -> {next_date.date()}")
 
             print(f"Activos seleccionados: {selected_assets}")
+
+            if hasattr(self, "portfolio_classifier") and self.portfolio_classifier is not None:
+                try:
+                    classification = self.portfolio_classifier.classify(selected_assets)
+                    print(f"Portfolio classified as: {classification}")
+                except Exception as e:
+                    print(f"[PortfolioClassifier ERROR]: {e}")
 
             weights_dict = {
                 'SVR-CPO': self.allocate_svr(selected_assets, date, self.cap_type),
