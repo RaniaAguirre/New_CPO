@@ -608,22 +608,35 @@ class SVRModel(BasePortfolioModel):
         return self.model.predict(X)
 #XGBoost   
 class XGBoostModel(BasePortfolioModel):
-    def __init__(self):
-        self.model = xgb.XGBRegressor(
-            n_estimators=250, 
-            max_depth=4, 
-            learning_rate=0.049221833118794175,
-            subsample=0.8645617337327893,
-            colsample_bytree=0.9129687689033119,
-            gamma=0.08648654064554967,
-            reg_alpha=0.1051912791786866,
-            reg_lambda=0.280839131994105,
-            objective='reg:squarederror'
+    def __init__(self, 
+                 n_estimators=300, 
+                 max_depth=6, 
+                 learning_rate=0.09437520854025253, 
+                 subsample=0.760134409258957, 
+                 colsample_bytree=0.7844564369302189, 
+                 gamma=0.15628002532567653, 
+                 reg_alpha=0.8255009142363116, 
+                 reg_lambda=0.17066679740109292, 
+                 objective='reg:squarederror',
+                 **params):
+        # Use new Optuna best params as defaults, but allow override
+        default_params = dict(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            subsample=subsample,
+            colsample_bytree=colsample_bytree,
+            gamma=gamma,
+            reg_alpha=reg_alpha,
+            reg_lambda=reg_lambda,
+            objective=objective
         )
+        default_params.update(params)
+        self.model = xgb.XGBRegressor(**default_params)
 
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
-        print(" XGBoost optimizado entrenado con éxito.")
+        print("XGBoost model trained.")
 
     def predict(self, X):
         return self.model.predict(X)
