@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import seaborn as sns
 import random
-from Classes import PortfolioClassifier
-
-
 
 
 class BacktestMultiStrategy:
@@ -79,6 +76,14 @@ class BacktestMultiStrategy:
             date_asof = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
             next_date_asof = self.data.index[self.data.index.get_indexer([next_date], method='pad')[0]]
 
+            price_subset = prices.loc[date_asof:next_date_asof]
+
+            # Revisar si el índice tiene frecuencia diaria
+            date_diffs = price_subset.index.to_series().diff().dropna()
+            unique_diffs = date_diffs.unique()
+
+            print(f"[DEBUG] Frecuencias únicas entre fechas en precios ({date_asof} a {next_date_asof}): {unique_diffs}")
+            
             returns = prices.pct_change().loc[date_asof:next_date_asof].dropna()
 
             for strategy in strategies:
@@ -97,9 +102,12 @@ class BacktestMultiStrategy:
                     portfolio_values[strategy].append(portfolio_values[strategy][-1])
                     continue
 
-                for r in strat_returns:
-                    new_value = portfolio_values[strategy][-1] * (1+r)
-                    portfolio_values[strategy].append(new_value)
+                initial_value = portfolio_values[strategy][-1]
+
+                cumulative_returns = (1 + strat_returns).cumprod()
+                new_values = initial_value * cumulative_returns
+
+                portfolio_values[strategy].extend(new_values.tolist())
 
         for strategy in strategies:
             self.results[strategy] = portfolio_values[strategy]
@@ -123,6 +131,7 @@ class BacktestMultiStrategy:
 
     def select_assets(self, date):
         all_assets = self.data['Price'].columns.tolist()
+        all_assets = [a for a in all_assets if a.lower() != "date"]
         asof_date = self.data.index[self.data.index.get_indexer([date], method='pad')[0]]
         available_assets = [asset for asset in all_assets if not pd.isna(self.data.loc[asof_date, ('Price', asset)])]
         return available_assets

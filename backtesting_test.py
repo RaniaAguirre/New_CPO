@@ -5,14 +5,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from Backtesting import BacktestMultiStrategy
 import os
-from Classes import PortfolioClassifier
 
 
 
 # Crear carpeta para guardar gráficas
 os.makedirs("plots", exist_ok=True)
 
-data = pd.read_csv("daily_dbs\dbs_backtesting.csv", index_col=0)
+data = pd.read_csv("daily_dbs/dbs_backtesting.csv", index_col=0)
 data.index = pd.to_datetime(data.index)
 
 indicator_cols = data.columns[-9:].tolist()
@@ -36,7 +35,7 @@ xgboost_models = {
 #classifier = pickle.load(open("portfolio_classifier.pkl", "rb"))
 
 # === Simulaciones ===
-n_simulations = 2
+n_simulations = 10
 results = []
 risk_free_rate = 0.042
 rfr_daily = risk_free_rate/252
@@ -54,11 +53,7 @@ for sim in range(n_simulations):
     # Correr backtesting
     bt = BacktestMultiStrategy(combined_data, svr_models)
     
-    bt.portfolio_classifier = PortfolioClassifier("daily_dbs/market_caps.xlsx")
-    for _ in range(5):
-        random_tickers = bt.portfolio_classifier.get_random_portfolio(n = 20)
-        bt.portfolio_classifier.add_reference_portfolio(random_tickers)     
-    
+
     bt.simulate(cap_type)
 
     daily_returns = bt.evolution()
@@ -69,11 +64,13 @@ for sim in range(n_simulations):
 
         if not history.empty:
             rendimiento_anual = history.mean() * 252
+            print(f"[DEBUG] N de retornos diarios en {strategy}: {len(history)}. Numero de valores unicos en history: {history.nunique()}")
+            print(f"[DEBUG] Std sin annualizar: {history.std(ddof=1)}")
             std_anual = history.std(ddof=1) * np.sqrt(252)
             excess_returns = history - rfr_daily
-            downside_returns = excess_returns[excess_returns < 0]
+            downside_returns = excess_returns[excess_returns < rfr_daily]
             downside_deviation = downside_returns.std(ddof=1) * np.sqrt(252) if not downside_returns.empty else np.nan
-            sortino = excess_returns / downside_deviation
+            sortino = excess_returns.mean() / downside_deviation
         else:
             rendimiento_anual = std_anual = downside_deviation = sortino = np.nan
             
