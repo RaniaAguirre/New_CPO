@@ -7,7 +7,7 @@ import random
 
 
 class BacktestMultiStrategy:
-    def __init__(self, data, svr_models, initial_capital=1_000_000):
+    def __init__(self, data, svr_models, xgboost_models, initial_capital=1_000_000):
         """
         data: DataFrame que contiene precios históricos (mensuales) y los indicadores de mercado,
               debe tener columnas multi-indexadas: nivel 0 = tipo de dato ("Price", "Indicator"), nivel 1 = nombre
@@ -17,13 +17,13 @@ class BacktestMultiStrategy:
         """
         self.data = data
         self.svr_models = svr_models
-        #self.xgboost_models = xgboost_models
+        self.xgboost_models = xgboost_models
         self.initial_capital = initial_capital
 
 
         self.results = {
             'SVR-CPO': [],
-            #'XGBoost-CPO': [],
+            'XGBoost-CPO': [],
             'EqualWeight': [],
             'MinVar': [],
             'MaxSharpe': []
@@ -66,7 +66,7 @@ class BacktestMultiStrategy:
 
             weights_dict = {
                 'SVR-CPO': self.allocate_svr(selected_assets, date, self.cap_type),
-                #'XGBoost-CPO': self.allocate_xgboost(selected_assets, date, self.cap_type),
+                'XGBoost-CPO': self.allocate_xgboost(selected_assets, date, self.cap_type),
                 'EqualWeight': self.equal_weight(selected_assets),
                 'MinVar': self.min_var(selected_assets, date),
                 'MaxSharpe': self.max_sharpe(selected_assets, date)
@@ -154,7 +154,7 @@ class BacktestMultiStrategy:
 
         return dict(zip(assets, best_weights))
 
-    """
+    
     def allocate_xgboost(self, assets, date, cap_type, n_samples=100):
         model = self.xgboost_models[cap_type]
         indicators = self.data.loc[self.data.index.asof(date), ('Indicator', slice(None))].values
@@ -171,7 +171,7 @@ class BacktestMultiStrategy:
                 best_weights = w
 
         return dict(zip(assets, best_weights))
-    """
+    
 
     def sample_weight_combinations(self, n_assets, n_samples):
         return np.random.dirichlet(np.ones(n_assets), size=n_samples)
@@ -199,7 +199,7 @@ class BacktestMultiStrategy:
 
     def min_variance_portfolio_constrained(self, cov_matrix):
         n = len(cov_matrix)
-        x0 = np.ones(n) / n  # pesos iniciales iguales
+        x0 = np.ones(n) / n 
         def portfolio_variance(w):
             return np.dot(w.T, np.dot(cov_matrix.values, w))
         constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})

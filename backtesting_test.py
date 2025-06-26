@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from Backtesting import BacktestMultiStrategy
 import os
-
+import joblib
 
 
 # Crear carpeta para guardar gráficas
@@ -17,25 +17,33 @@ data.index = pd.to_datetime(data.index)
 indicator_cols = data.columns[-9:].tolist()
 price_cols = data.columns.difference(indicator_cols).tolist()
 
+df_caps = pd.read_csv("market_caps_kmeans.csv").set_index("Ticker")
+market_caps = df_caps["Market Cap"].to_dict()
+
 # === Cargar modelo SVR ===
 svr_models = {
-    'mid_cap': pickle.load(open("trained_models\LowCaps_SVR_mc.pkl", "rb")),
+    'high_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
+    'mid_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
+    'low_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb"))
 }
 
 # === Cargar modelo XGBoost ===
-"""
 xgboost_models = {
-    'high_cap': pickle.load(open("trained_models/Dataset_1_XGBoost_Sharpe.pkl", "rb")),
-    'mid_cap': pickle.load(open("trained_models/Dataset_2_XGBoost_Sharpe.pkl", "rb")),
-    'low_cap': pickle.load(open("trained_models/Dataset_3_XGBoost_Sharpe.pkl", "rb"))
+    'high_cap': pickle.load(open("trained_models/xgboost_model_HighCap.pkl", "rb")),
+    'mid_cap': pickle.load(open("trained_models/xgboost_model_MidCap.pkl", "rb")),
+    'low_cap': pickle.load(open("trained_models/xgboost_model_LowCap.pkl", "rb"))
 }
-"""
 
 # === Inicializar clasificador ===
-#classifier = pickle.load(open("portfolio_classifier.pkl", "rb"))
+kmeans, cluster_map, _, _ = joblib.load("trained_models/kmeans_model.pkl")
+id_to_key = {
+    -1: "low_cap",
+     0: "mid_cap",
+     1: "high_cap"
+}
 
 # === Simulaciones ===
-n_simulations = 10
+n_simulations = 2
 results = []
 risk_free_rate = 0.042
 rfr_daily = risk_free_rate/252
@@ -47,11 +55,20 @@ for sim in range(n_simulations):
     price_multi = pd.concat([data[sampled_assets]], axis=1, keys=["Price"])
     ind_multi = pd.concat([data[indicator_cols]], axis=1, keys=["Indicator"])
     combined_data = pd.concat([price_multi, ind_multi], axis=1)
-    cap_type = "mid_cap"
-    print(f"Cap type seleccionado para esta simulación: {cap_type}")
 
+    def classify_portfolio(sampled_assets):
+        weights = [1/len(sampled_assets)] * len(sampled_assets)
+        cap = sum(market_caps.get(t, 0) * w for t, w in zip(sampled_assets, weights))
+        log_cap = np.log1p(cap)
+        cluster_idx = kmeans.predict([[log_cap]])[0]
+        cluster_id = cluster_map[cluster_idx]
+        cap_key = id_to_key[cluster_id]
+        return cap_key
+    
+    cap_type = classify_portfolio(sampled_assets)
+    print(f"Cap type seleccionado para esta simulación: {cap_type}")
     # Correr backtesting
-    bt = BacktestMultiStrategy(combined_data, svr_models)
+    bt = BacktestMultiStrategy(combined_data, svr_models, xgboost_models)
     
 
     bt.simulate(cap_type)
