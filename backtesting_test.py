@@ -20,21 +20,21 @@ price_cols = data.columns.difference(indicator_cols).tolist()
 df_caps = pd.read_csv("market_caps_kmeans.csv").set_index("Ticker")
 market_caps = df_caps["Market Cap"].to_dict()
 
-# === Cargar modelo SVR ===
+# Cargar modelo SVR
 svr_models = {
     'high_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
     'mid_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
     'low_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb"))
 }
 
-# === Cargar modelo XGBoost ===
+# Cargar modelo XGBoost
 xgboost_models = {
     'high_cap': pickle.load(open("trained_models/xgboost_model_HighCap.pkl", "rb")),
     'mid_cap': pickle.load(open("trained_models/xgboost_model_MidCap.pkl", "rb")),
     'low_cap': pickle.load(open("trained_models/xgboost_model_LowCap.pkl", "rb"))
 }
 
-# === Inicializar clasificador ===
+# Inicializar clasificador
 kmeans, cluster_map, _, _ = joblib.load("trained_models/kmeans_model.pkl")
 id_to_key = {
     -1: "low_cap",
@@ -42,7 +42,7 @@ id_to_key = {
      1: "high_cap"
 }
 
-# === Simulaciones ===
+# Simulaciones 
 n_simulations = 2
 results = []
 risk_free_rate = 0.042
@@ -81,13 +81,11 @@ for sim in range(n_simulations):
 
         if not history.empty:
             rendimiento_anual = history.mean() * 252
-            print(f"[DEBUG] N de retornos diarios en {strategy}: {len(history)}. Numero de valores unicos en history: {history.nunique()}")
-            print(f"[DEBUG] Std sin annualizar: {history.std(ddof=1)}")
             std_anual = history.std(ddof=1) * np.sqrt(252)
-            excess_returns = history - rfr_daily
-            downside_returns = excess_returns[excess_returns < rfr_daily]
-            downside_deviation = downside_returns.std(ddof=1) * np.sqrt(252) if not downside_returns.empty else np.nan
-            sortino = excess_returns.mean() / downside_deviation
+            excess_daily = history - rfr_daily
+            downside_daily = excess_daily[excess_daily < rfr_daily]
+            downside_ann = downside_daily.std() * np.sqrt(252) if not downside_daily.empty else np.nan
+            sortino = ((rendimiento_anual - risk_free_rate) / downside_ann)
         else:
             rendimiento_anual = std_anual = downside_deviation = sortino = np.nan
             
@@ -99,12 +97,12 @@ for sim in range(n_simulations):
             "Rendimiento Anual Promedio": rendimiento_anual,
             "Desviación Estándar": std_anual,
             "Rendimiento Efectivo": (Pt / Po) - 1,
-            "Downside Risk": downside_deviation,
+            "Downside Risk": downside_ann,
             "CAGR": (Pt / Po) ** (1 / ((bt.end_date - bt.start_date).days / 365.25)) - 1,
             'Sortino ratio': sortino
         })
 
-# === Crear DataFrame con los resultados ===
+# Crear DataFrame con los resultados
 results_df = pd.DataFrame(results)
 numeric_cols = ["Rendimiento Anual Promedio",
     "Desviación Estándar",
@@ -116,20 +114,55 @@ summary = results_df.groupby("Metodología")[numeric_cols].mean(numeric_only=Tru
 print("\nResumen de métricas promedio por metodología:")
 print(summary)
 
-# === Gráficas ===
+# Gráficas
+
+# Plot Rendimiento anual
 summary["Rendimiento Anual Promedio"].plot(kind='bar', title='Rendimiento Anual Promedio por Metodología', ylabel='Promedio', xlabel='Metodología')
 plt.grid(True)
 plt.tight_layout()
 plt.savefig("plots/rendimiento_anual_promedio.png")
 plt.close()
 
-sns.boxplot(data=results_df, x="Metodología", y="CAGR")
-plt.title("Distribución del CAGR por Metodología")
-plt.grid(True)
+# Histograma Rendimiento Efectivo
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["Rendimiento Efectivo"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del Rendimiento Efectivo: {method}")
+    axes[i].set_xlabel("Rendimiento Efectivo")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_cagr.png")
+plt.savefig("plots/histograma_rend_efectivo.png")
 plt.close()
 
+# Histograma Desviación Estándar
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["Desviación Estándar"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del Desviación Estándar: {method}")
+    axes[i].set_xlabel("Desviación Estándar")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
+plt.tight_layout()
+plt.savefig("plots/histograma_volatilidad.png")
+plt.close()
+
+# Histograma downside risk
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["Downside Risk"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del Downside Risk: {method}")
+    axes[i].set_xlabel("Downside Risk")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
+plt.tight_layout()
+plt.savefig("plots/histograma_downside.png")
+plt.close()
+
+# Histograma Rendimiento Anual
 strategies = results_df["Metodología"].unique()
 fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
 for i, method in enumerate(strategies):
@@ -142,13 +175,81 @@ plt.tight_layout()
 plt.savefig("plots/histogramas_rendimiento_anual.png")
 plt.close()
 
-summary["CAGR"].plot(kind="bar", title="CAGR Promedio por Metodología", ylabel="CAGR Promedio", xlabel="Metodología")
-plt.grid(True)
+# Histograma Ratio de Sortino
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["Sortino ratio"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del Ratio de Sortino: {method}")
+    axes[i].set_xlabel("Ratio de Sortino")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/cagr_promedio.png")
+plt.savefig("plots/histogramas_sortino.png")
 plt.close()
 
-# === Guardar resultados ===
+# Hisotgrama CAGR
+strategies = results_df["Metodología"].unique()
+fig, axes = plt.subplots(nrows=len(strategies), ncols=1, figsize=(10, 3 * len(strategies)))
+for i, method in enumerate(strategies):
+    sns.histplot(results_df[results_df["Metodología"] == method]["CAGR"], kde=True, stat="density", bins=10, ax=axes[i], alpha=0.7)
+    axes[i].set_title(f"Histograma del CAGR: {method}")
+    axes[i].set_xlabel("CAGR")
+    axes[i].set_ylabel("Densidad")
+    axes[i].grid(True)
+plt.tight_layout()
+plt.savefig("plots/histogramas_cagr.png")
+plt.close()
+
+# Boxplot Desviación Estándar
+sns.boxplot(data=results_df, x="Metodología", y="Desviación Estándar")
+plt.title("Distribución de la volatilidad por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_std.png")
+plt.close()
+
+# Boxplot downside risk
+sns.boxplot(data=results_df, x="Metodología", y="Downside Risk")
+plt.title("Distribución del Downside Risk por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_downside.png")
+plt.close()
+
+# Boxplot CAGR
+sns.boxplot(data=results_df, x="Metodología", y="CAGR")
+plt.title("Distribución del CAGR por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_cagr.png")
+plt.close()
+
+# Boxplot ratio de sortino
+sns.boxplot(data=results_df, x="Metodología", y="Sortino ratio")
+plt.title("Distribución del Sortino Ratio por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_sortino.png")
+plt.close()
+
+# Boxplot Rendimiento Anual
+sns.boxplot(data=results_df, x="Metodología", y="Rendimiento Anual Promedio")
+plt.title("Distribución del Rendimiento Anual Promedio por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_rend_anual.png")
+plt.close()
+
+# Boxplot Rend Efectivo
+sns.boxplot(data=results_df, x="Metodología", y="Rendimiento Efectivo")
+plt.title("Distribución del Rendimiento Efectivo por Metodología")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("plots/boxplot_rend_efectivo.png")
+plt.close()
+
+
 results_df.to_csv("plots/resultados_simulaciones.csv", index=False)
 summary.to_csv("plots/resumen_metricas.csv")
 

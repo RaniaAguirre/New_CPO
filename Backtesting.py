@@ -181,12 +181,27 @@ class BacktestMultiStrategy:
         return {a: 1/n for a in assets} if n > 0 else {}
 
     def min_var(self, assets, date):
-        prices = self.data.loc[:date, ('Price', assets)].dropna()
-        prices = prices.apply(pd.to_numeric, errors='coerce')
+        prices = (
+            self.data
+            .loc[:date, ('Price', assets)]
+            .dropna(how='any')             # filas sin ningún NA
+            .apply(pd.to_numeric, errors='coerce')
+        )
+        if prices.shape[0] < 2:
+            return self.equal_weight(assets)
         returns = prices.pct_change().dropna()
-        cov_matrix = returns.cov()
-        weights = self.min_variance_portfolio_constrained(cov_matrix)
-        return dict(zip(assets, weights))
+        if returns.shape[0] < 2:
+            return self.equal_weight(assets)
+        cov = returns.cov().values
+        n = cov.shape[0]
+        inv_cov = np.linalg.pinv(cov)
+        raw_w = inv_cov.dot(np.ones(n))
+        raw_w = np.clip(raw_w, 0, None)
+        if raw_w.sum() == 0:
+            return self.equal_weight(assets)
+        w = raw_w / raw_w.sum()
+
+        return dict(zip(assets, w))
 
     def max_sharpe(self, assets, date, risk_free_rate=0.05):
         prices = self.data.loc[:date, ('Price', assets)].dropna()
@@ -197,15 +212,6 @@ class BacktestMultiStrategy:
         weights = self.max_sharpe_portfolio_constrained(mean_returns.values, cov_matrix.values, risk_free_rate)
         return dict(zip(assets, weights))
 
-    def min_variance_portfolio_constrained(self, cov_matrix):
-        n = len(cov_matrix)
-        x0 = np.ones(n) / n 
-        def portfolio_variance(w):
-            return np.dot(w.T, np.dot(cov_matrix.values, w))
-        constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1})
-        bounds = [(0, 1) for _ in range(n)]
-        result = minimize(portfolio_variance, x0, method='SLSQP', bounds=bounds, constraints=constraints)
-        return result.x
 
     def max_sharpe_portfolio_constrained(self, expected_returns, cov_matrix, risk_free_rate):
         n = len(expected_returns)
