@@ -593,7 +593,7 @@ class NeuralNetworkModel(BasePortfolioModel):
         return self.model.predict(X).flatten()
 # SVR model    
 class SVRModel(BasePortfolioModel):
-    def __init__(self, kernel='rbf', C=10, epsilon=0.01):
+    def __init__(self, kernel, C, epsilon):
         self.kernel = kernel
         self.C = C
         self.epsilon = epsilon
