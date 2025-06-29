@@ -22,8 +22,8 @@ market_caps = df_caps["Market Cap"].to_dict()
 
 # Cargar modelo SVR
 svr_models = {
-    'high_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
-    'mid_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb")),
+    'high_cap': pickle.load(open("trained_models/HighCaps_SVR_mc.pkl", "rb")),
+    'mid_cap': pickle.load(open("trained_models/MidCaps_SVR_mc.pkl", "rb")),
     'low_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb"))
 }
 
@@ -43,7 +43,8 @@ id_to_key = {
 }
 
 # Simulaciones 
-n_simulations = 2
+n_simulations = 1_000
+
 results = []
 risk_free_rate = 0.042
 rfr_daily = risk_free_rate/252

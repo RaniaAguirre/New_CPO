@@ -30,16 +30,23 @@ class BacktestMultiStrategy:
         }
 
     def get_random_backtest_period(self):
-        start_years = range(2010,2021)
-        combinations = [(f"{start}-07-01", f"{start + 5}-01-01") for start in start_years if start + 5 <= 2025]
-        start_date, end_date = random.choice(combinations)
-        return pd.to_datetime(start_date), pd.to_datetime(end_date)
+        first_valid = pd.Timestamp("2010-07-01")
+        last_valid = self.data.index.max() - pd.DateOffset(years=5)
+        if last_valid < first_valid:
+            raise ValueError("Pocos datos para un backtesting de 5 años")
+        span_days = (last_valid-first_valid).days
+        offset = random.randint(0, span_days)
+        start_date = first_valid + pd.Timedelta(days=offset)
+        end_date = start_date + pd.DateOffset(years=5)
+        return start_date, end_date
 
 
     def simulate(self, cap_type):
         self.cap_type = cap_type
         self.start_date, self.end_date = self.get_random_backtest_period()
-        rebalance_dates = pd.date_range(self.start_date, self.end_date, freq='6MS') + pd.offsets.MonthBegin(1)
+        rebalance_dates = pd.date_range(start=self.start_date, end=self.end_date, freq=pd.DateOffset(months=6))
+        if rebalance_dates[-1] < self.end_date:
+            rebalance_dates = rebalance_dates.append(pd.DatetimeIndex([self.end_date]))
         strategies = list(self.results.keys())
         portfolio_values = {s: [self.initial_capital] for s in strategies}
 
