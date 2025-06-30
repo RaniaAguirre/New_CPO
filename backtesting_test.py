@@ -9,7 +9,7 @@ import joblib
 
 
 # Crear carpeta para guardar gráficas
-os.makedirs("plots", exist_ok=True)
+os.makedirs("plots2", exist_ok=True)
 
 data = pd.read_csv("daily_dbs/dbs_backtesting.csv", index_col=0)
 data.index = pd.to_datetime(data.index)
@@ -22,9 +22,9 @@ market_caps = df_caps["Market Cap"].to_dict()
 
 # Cargar modelo SVR
 svr_models = {
-    'high_cap': pickle.load(open("trained_models/HighCaps_SVR_mc.pkl", "rb")),
-    'mid_cap': pickle.load(open("trained_models/MidCaps_SVR_mc.pkl", "rb")),
-    'low_cap': pickle.load(open("trained_models/LowCaps_SVR_mc.pkl", "rb"))
+    'high_cap': pickle.load(open("trained_models/HighCap_SVR_2.pkl", "rb")),
+    'mid_cap': pickle.load(open("trained_models/MidCap_SVR_2.pkl", "rb")),
+    'low_cap': pickle.load(open("trained_models/LowCap_SVR_2.pkl", "rb"))
 }
 
 # Cargar modelo XGBoost
@@ -121,7 +121,7 @@ print(summary)
 summary["Rendimiento Anual Promedio"].plot(kind='bar', title='Rendimiento Anual Promedio por Metodología', ylabel='Promedio', xlabel='Metodología')
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/rendimiento_anual_promedio.png")
+plt.savefig("plots2/rendimiento_anual_promedio.png")
 plt.close()
 
 # Histograma Rendimiento Efectivo
@@ -134,7 +134,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histograma_rend_efectivo.png")
+plt.savefig("plots2/histograma_rend_efectivo.png")
 plt.close()
 
 # Histograma Desviación Estándar
@@ -147,7 +147,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histograma_volatilidad.png")
+plt.savefig("plots2/histograma_volatilidad.png")
 plt.close()
 
 # Histograma downside risk
@@ -160,7 +160,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histograma_downside.png")
+plt.savefig("plots2/histograma_downside.png")
 plt.close()
 
 # Histograma Rendimiento Anual
@@ -173,7 +173,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histogramas_rendimiento_anual.png")
+plt.savefig("plots2/histogramas_rendimiento_anual.png")
 plt.close()
 
 # Histograma Ratio de Sortino
@@ -186,7 +186,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histogramas_sortino.png")
+plt.savefig("plots2/histogramas_sortino.png")
 plt.close()
 
 # Hisotgrama CAGR
@@ -199,7 +199,7 @@ for i, method in enumerate(strategies):
     axes[i].set_ylabel("Densidad")
     axes[i].grid(True)
 plt.tight_layout()
-plt.savefig("plots/histogramas_cagr.png")
+plt.savefig("plots2/histogramas_cagr.png")
 plt.close()
 
 # Boxplot Desviación Estándar
@@ -207,7 +207,7 @@ sns.boxplot(data=results_df, x="Metodología", y="Desviación Estándar")
 plt.title("Distribución de la volatilidad por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_std.png")
+plt.savefig("plots2/boxplot_std.png")
 plt.close()
 
 # Boxplot downside risk
@@ -215,7 +215,7 @@ sns.boxplot(data=results_df, x="Metodología", y="Downside Risk")
 plt.title("Distribución del Downside Risk por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_downside.png")
+plt.savefig("plots2/boxplot_downside.png")
 plt.close()
 
 # Boxplot CAGR
@@ -223,7 +223,7 @@ sns.boxplot(data=results_df, x="Metodología", y="CAGR")
 plt.title("Distribución del CAGR por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_cagr.png")
+plt.savefig("plots2/boxplot_cagr.png")
 plt.close()
 
 # Boxplot ratio de sortino
@@ -231,7 +231,7 @@ sns.boxplot(data=results_df, x="Metodología", y="Sortino ratio")
 plt.title("Distribución del Sortino Ratio por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_sortino.png")
+plt.savefig("plots2/boxplot_sortino.png")
 plt.close()
 
 # Boxplot Rendimiento Anual
@@ -239,7 +239,7 @@ sns.boxplot(data=results_df, x="Metodología", y="Rendimiento Anual Promedio")
 plt.title("Distribución del Rendimiento Anual Promedio por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_rend_anual.png")
+plt.savefig("plots2/boxplot_rend_anual.png")
 plt.close()
 
 # Boxplot Rend Efectivo
@@ -247,12 +247,12 @@ sns.boxplot(data=results_df, x="Metodología", y="Rendimiento Efectivo")
 plt.title("Distribución del Rendimiento Efectivo por Metodología")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("plots/boxplot_rend_efectivo.png")
+plt.savefig("plots2/boxplot_rend_efectivo.png")
 plt.close()
 
 
-results_df.to_csv("plots/resultados_simulaciones.csv", index=False)
-summary.to_csv("plots/resumen_metricas.csv")
+results_df.to_csv("plots2/resultados_simulaciones.csv", index=False)
+summary.to_csv("plots2/resumen_metricas.csv")
 
-with open("plots/results_list.pkl", "wb") as f:
+with open("plots2/results_list.pkl", "wb") as f:
     pickle.dump(results, f)
